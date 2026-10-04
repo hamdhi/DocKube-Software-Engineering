@@ -14,6 +14,10 @@ the project.
 
 import html
 import re
+import textwrap
+import tkinter
+import tkinter as tk
+import tkinter.font
 from html.parser import HTMLParser
 
 import customtkinter as ctk
@@ -35,9 +39,6 @@ YELLOW = "#d29922"
 TABLE_HEADING_BG = "#21262d"
 TABLE_STRIPE = "#1a1f27"
 TABLE_BG = "#161b22"
-
-# Slight breathing room so a chapter heading is not glued to the pane edge.
-HEADER_OFFSET = 12
 
 # Fixed width for the chapter sidebar. Setting this as a column minsize is
 # what gives the scrollable TOC a real width to draw its scrollbar in.
@@ -233,58 +234,190 @@ def parse_content(source):
     return parser.blocks
 
 
-class TableWidget(ctk.CTkFrame):
-    """A real, bordered table.
+class TableWidget(tk.Frame):
+    """A real, bordered table drawn on a single canvas.
 
-    ``tk.Text`` cannot draw grids, so tables are built from actual frames and
-    labels. That gives proper column alignment, a shaded header and zebra
-    striping instead of pipes on a single line.
+    An earlier version built every cell from its own ``tk.Label``. Measuring
+    that showed roughly 3 ms per label, so one large chapter cost well over a
+    second and the popup was painfully slow. A canvas draws the same grid with
+    rectangles and text items, which are not widgets and cost a fraction of
+    that, so a whole table is now one widget.
+
+    Cell text wraps at the column width, because ``create_text``'s ``width``
+    option constrains it. Without wrapping, long cells render at their full
+    natural width and overlap the neighbouring column.
     """
 
+    CELL_PADX = 8
+    CELL_PADY = 6
+    MIN_COLUMN = 90
+    MIN_WRAP = 60
+
+    _normal_font = None
+    _bold_font = None
+    _metric_cache = {}
+    _font_root = None
+
     def __init__(self, master, rows, max_width=980):
-        super().__init__(master, fg_color=TABLE_BG, corner_radius=0)
+        super().__init__(master, background=TABLE_BG)
         self.rows = rows
-        columns = max(len(row) for row in rows)
-        widths = self._compute_widths(rows, columns, max_width)
+        self._max_width = max_width
+        self._columns = max(len(row) for row in rows)
 
-        for column in range(columns):
-            self.columnconfigure(column, weight=1, minsize=widths[column])
+        # Fonts belong to a Tk interpreter, so they are recreated whenever the
+        # default root changes. A cached Font from a destroyed interpreter
+        # raises TclError on use.
+        if (TableWidget._font_root is not tkinter._default_root
+                or TableWidget._normal_font is None):
+            TableWidget._normal_font = tk.font.Font(
+                family="Segoe UI", size=10)
+            TableWidget._bold_font = tk.font.Font(
+                family="Segoe UI", size=10, weight="bold")
+            TableWidget._metric_cache.clear()
+            TableWidget._font_root = tkinter._default_root
 
-        for row_index, row in enumerate(rows):
-            is_header = row_index == 0
-            background = TABLE_HEADING_BG if is_header else (
-                TABLE_BG if row_index % 2 else TABLE_STRIPE)
-            for column in range(columns):
-                text = row[column] if column < len(row) else ""
-                tk.Label(
-                    self, text=text, background=background,
-                    foreground="#ffffff" if is_header else FG,
-                    font=("Segoe UI", 10, "bold") if is_header else ("Segoe UI", 10),
-                    justify="left", anchor="w", wraplength=0,
-                    padx=10, pady=6, borderwidth=0,
-                    highlightthickness=1, highlightbackground=BORDER
-                ).grid(row=row_index, column=column, sticky="ew")
+        self.canvas = tk.Canvas(self, background=TABLE_BG,
+                                highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True)
 
-    @staticmethod
-    def _compute_widths(rows, columns, max_width):
-        """Give wide columns more room, then scale to fit the pane."""
-        longest = [0] * columns
-        for row in rows:
+        self._last_width = 0
+        self._last_height = 0
+        self._laid_out = False
+        self.bind("<Configure>", self._on_resize, add="+")
+
+    def _on_resize(self, event):
+        # Only re-lay-out on a real width change; re-flowing a large table on
+        # every pixel of a drag is what made resizing stutter. The first
+        # Configure is the one that matters, so no idle fallback is needed.
+        if abs(event.width - self._last_width) > 4:
+            self._relayout(event.width)
+
+    def _column_widths(self, total_width):
+        """Distribute the available width using the longest cell per column."""
+        longest = [1] * self._columns
+        for row in self.rows:
             for column, cell in enumerate(row):
                 longest[column] = max(longest[column], len(str(cell)))
-        if sum(longest) == 0:
-            longest = [80] * columns
-        scale = min(1.0, max_width / max(sum(longest), 1))
-        return [max(90, int(value * scale)) for value in longest]
+
+        # Weight by content length but damp it, so one very long cell cannot
+        # starve every other column.
+        weights = [min(value, 90) ** 0.5 for value in longest]
+        usable = max(total_width - 2, self._columns * self.MIN_COLUMN)
+        scale = min(1.0, self._max_width / max(sum(weights), 1e-6))
+
+        widths = []
+        for weight in weights:
+            widths.append(max(self.MIN_COLUMN,
+                              int(usable * weight * scale / sum(weights))))
+        return widths
+
+    def _metrics(self, font):
+        """Character width and line height, measured once per font."""
+        key = str(font)
+        cached = TableWidget._metric_cache.get(key)
+        if cached is None:
+            cached = (max(1.0, font.measure("0")),
+                      max(1, font.metrics("linespace")))
+            TableWidget._metric_cache[key] = cached
+        return cached
+
+    def _relayout(self, total_width=None):
+        if not self.rows:
+            return
+        if total_width is None:
+            total_width = max(self.canvas.winfo_width(), 1)
+        total_width = max(total_width, self._columns * self.MIN_COLUMN + 2)
+        # Re-laying out on every Configure event cascades: sizing the frame
+        # fires another Configure. Only act on a genuine width change.
+        if self._laid_out and abs(total_width - self._last_width) <= 4:
+            return
+        self._last_width = total_width
+
+        canvas = self.canvas
+        canvas.delete("all")
+
+        columns = self._column_widths(total_width)
+        offsets = []
+        x = 1
+        for width in columns:
+            offsets.append(x)
+            x += width
+
+        pad = self.CELL_PADX
+        wrap_widths = [max(self.MIN_WRAP, w - 2 * pad) for w in columns]
+        normal_char, normal_line = self._metrics(self._normal_font)
+        bold_char, bold_line = self._metrics(self._bold_font)
+
+        # Pre-wrap every cell into explicit lines. Canvas does not break long
+        # unbroken words, so something like an ARN in a narrow column would
+        # render at full width and spill over the next column, which is exactly
+        # the overlapping-text bug. Wrapping here also gives the row height
+        # without asking Tk to measure anything.
+        wrapped_rows = []
+        row_heights = []
+        for row_index, row in enumerate(self.rows):
+            is_header = row_index == 0
+            char_w, line_h = (bold_char, bold_line) if is_header else (
+                normal_char, normal_line)
+            lines = 1
+            cells = []
+            for column in range(self._columns):
+                text = str(row[column]) if column < len(row) else ""
+                per_line = max(4, int(wrap_widths[column] / char_w * 0.92))
+                wrapped = textwrap.wrap(text, per_line, break_long_words=True,
+                                        break_on_hyphens=False) or [""]
+                lines = max(lines, len(wrapped))
+                cells.append("\n".join(wrapped))
+            wrapped_rows.append(cells)
+            row_heights.append(lines * line_h + 2 * self.CELL_PADY)
+
+        # Paint one filled rectangle per row rather than one per cell: every cell in
+        # a row shares the same fill, so per-cell rectangles only existed to
+        # draw the vertical separators, which are cheaper as lines.
+        y = 1
+        for row_index in range(len(self.rows)):
+            height = row_heights[row_index]
+            is_header = row_index == 0
+            fill = TABLE_HEADING_BG if is_header else (
+                TABLE_BG if row_index % 2 else TABLE_STRIPE)
+            canvas.create_rectangle(
+                offsets[0], y, offsets[-1] + columns[-1], y + height,
+                fill=fill, outline=BORDER)
+            for column in range(1, self._columns):
+                canvas.create_line(offsets[column], y,
+                                   offsets[column], y + height, fill=BORDER)
+            y += height
+
+        # Then draw the text on top. The lines are already wrapped, so no
+        # width is passed to create_text.
+        y = 1
+        for row_index, row in enumerate(self.rows):
+            height = row_heights[row_index]
+            is_header = row_index == 0
+            font = self._bold_font if is_header else self._normal_font
+            colour = "#ffffff" if is_header else FG
+            for column in range(self._columns):
+                canvas.create_text(
+                    offsets[column] + pad, y + self.CELL_PADY,
+                    text=wrapped_rows[row_index][column],
+                    anchor="nw", justify="left", font=font, fill=colour)
+            y += height
+
+        self._laid_out = True
+        self._last_height = y + 1
+        self.configure(height=self._last_height)
 
 
 class LearningWindow(ctk.CTkToplevel):
     """The popup study guide.
 
     Opens in its own window so the main DocKube layout keeps its vertical
-    space for commands. A sidebar lists every chapter; clicking one scrolls
-    the content pane to that section.
+    space for commands. A sidebar lists every chapter; clicking one swaps the
+    content pane to that chapter.
     """
+
+    # Parsed chapters, shared across popups so revisiting one is instant.
+    _block_cache = {}
 
     def __init__(self, master, chapters):
         super().__init__(master)
@@ -296,7 +429,6 @@ class LearningWindow(ctk.CTkToplevel):
         self._section_marks = []
         self._toc_buttons = {}
         self._build()
-        self.show_chapter(0)
 
     def _build(self):
         self.grid_columnconfigure(1, weight=1)
@@ -344,6 +476,13 @@ class LearningWindow(ctk.CTkToplevel):
         footer.grid_columnconfigure(0, weight=1)
         self.status = ctk.CTkLabel(footer, text="", anchor="w", text_color=MUTED)
         self.status.grid(row=0, column=0, sticky="w")
+        # Scrolling between chapters is gone, so give explicit step buttons.
+        self.prev_btn = ctk.CTkButton(footer, text="Previous", width=90,
+                                      command=lambda: self.step_chapter(-1))
+        self.prev_btn.grid(row=0, column=1, padx=(8, 4))
+        self.next_btn = ctk.CTkButton(footer, text="Next", width=90,
+                                      command=lambda: self.step_chapter(1))
+        self.next_btn.grid(row=0, column=2)
 
         # Tables are embedded as real child widgets inside this frame so they
         # scroll together with the surrounding text.
@@ -351,34 +490,57 @@ class LearningWindow(ctk.CTkToplevel):
         self.outer.grid(row=1, column=1, sticky="nsew", padx=16, pady=4)
         self.outer.grid_columnconfigure(0, weight=1)
 
-        self._render()
+        self._current = None
+        self.show_chapter(0)
+
+    def step_chapter(self, delta):
+        """Move to the previous or next chapter, if there is one."""
+        target = (self._current or 0) + delta
+        if 0 <= target < len(self.chapters):
+            self.show_chapter(target)
 
     def _clear(self):
         for child in self.outer.winfo_children():
             child.destroy()
 
-    def _render(self):
-        """Render every chapter into the scroll pane."""
-        self._clear()
-        self._section_marks = []
-        row = 0
-        for index, (title, body) in enumerate(self.chapters):
-            row = self._render_chapter(index, title, body, row)
+    def _render(self, index):
+        """Render one chapter only.
 
+        Rendering all fifteen chapters built about 5,600 widgets inside a
+        ``CTkScrollableFrame``, which rescans its children on every geometry
+        change. That is quadratic and took the popup about 18 seconds to open.
+        Building only the chapter the reader asked for keeps the widget count
+        in the low hundreds and makes opening instant.
+        """
+        self._clear()
+        self._current = index
+        title, body = self.chapters[index]
+        self._render_chapter(index, title, body, 0)
+        self.outer._parent_canvas.yview_moveto(0.0)
 
     def _render_chapter(self, index, title, body, row):
-        banner = ctk.CTkFrame(self.outer, fg_color="#0d1117", corner_radius=6)
+        banner = tk.Frame(self.outer, background="#0d1117",
+                          highlightbackground=BORDER, highlightthickness=1)
         banner.grid(row=row, column=0, sticky="ew", pady=(10, 6), padx=2)
         banner.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(banner, text=f"{index + 1}. {title}", anchor="w",
-                     font=ctk.CTkFont(size=16, weight="bold"),
-                     text_color=ACCENT).grid(row=0, column=0, sticky="w", padx=12, pady=10)
-        self._section_marks.append((index, banner))
+        tk.Label(banner, text=f"{index + 1}. {title}", background="#0d1117",
+                 foreground=ACCENT, anchor="w", justify="left",
+                 font=("Segoe UI", 16, "bold"),
+                 padx=12, pady=10).grid(row=0, column=0, sticky="ew")
+        self._section_marks = [(index, banner)]
         row += 1
 
-        for block in parse_content(body):
+        for block in self._blocks_for(index, body):
             row = self._render_block(block, row)
         return row
+
+    @staticmethod
+    def _blocks_for(index, body):
+        """Parse a chapter once and remember it for the next visit."""
+        cache = LearningWindow._block_cache
+        if index not in cache:
+            cache[index] = parse_content(body)
+        return cache[index]
 
     def _render_block(self, block, row):
         if block.kind == "title":
@@ -405,10 +567,13 @@ class LearningWindow(ctk.CTkToplevel):
         return row
 
     def _text(self, row, text, size=12, color=FG, bold=False):
-        label = ctk.CTkLabel(
-            self.outer, text=text, anchor="w", justify="left", wraplength=900,
-            font=ctk.CTkFont(size=size, weight="bold" if bold else "normal"),
-            text_color=color)
+        # A plain tk.Label rather than a CTkLabel: CustomTkinter draws every
+        # widget on a rounded canvas, which made chapter switching crawl. For
+        # flat text on a flat background the result looks identical.
+        label = tk.Label(
+            self.outer, text=text, background=BG, foreground=color,
+            anchor="w", justify="left", wraplength=900,
+            font=("Segoe UI", size, "bold" if bold else "normal"))
         label.grid(row=row, column=0, sticky="ew", pady=2, padx=4)
         return row + 1
 
@@ -422,43 +587,25 @@ class LearningWindow(ctk.CTkToplevel):
         return row + 1
 
     def _table(self, rows, row):
-        holder = ctk.CTkFrame(self.outer, fg_color="transparent")
+        holder = tk.Frame(self.outer)
         holder.grid(row=row, column=0, sticky="ew", pady=8, padx=4)
         TableWidget(holder, rows).pack(fill="x", expand=True)
         return row + 1
 
-    def _scroll_to(self, widget):
-        """Scroll so ``widget`` sits near the top of the content pane.
-
-        ``yview_moveto`` takes a fraction of the **whole** document, so the
-        target pixel offset has to be divided by the full scrollregion height.
-        Subtracting the current offset instead (an earlier mistake) only works
-        when jumping from the very top, which made the sidebar highlight one
-        chapter while the pane showed another.
-        """
-        self.update_idletasks()
-        canvas = getattr(self.outer, "_parent_canvas", None)
-        if canvas is None:
-            return
-        canvas.update_idletasks()
-        try:
-            total = float(canvas.cget("scrollregion").split()[3])
-        except (IndexError, ValueError):
-            return
-        if total <= 0:
-            return
-        target = widget.winfo_y()
-        fraction = (target - HEADER_OFFSET) / total
-        canvas.yview_moveto(min(1.0, max(0.0, fraction)))
-
     def show_chapter(self, index):
-        """Scroll the content pane so the requested chapter is in view."""
+        """Show one chapter, rebuilding the pane only when it changes."""
+        if not (0 <= index < len(self.chapters)):
+            return
+        if index != self._current:
+            self._render(index)
         for number, button in self._toc_buttons.items():
             button.configure(
                 fg_color="#1f6feb" if number == index else "transparent")
-        for number, widget in self._section_marks:
-            if number == index:
-                self._scroll_to(widget)
-                self.status.configure(
-                    text=f"Chapter {index + 1} of {len(self.chapters)}")
-                return
+        self._update_footer(index)
+        self.status.configure(text=f"Chapter {index + 1} of {len(self.chapters)}")
+
+    def _update_footer(self, index):
+        """Grey out Previous/Next when there is nothing in that direction."""
+        state = lambda on: "normal" if on else "disabled"  # noqa: E731
+        self.prev_btn.configure(state=state(index > 0))
+        self.next_btn.configure(state=state(index < len(self.chapters) - 1))

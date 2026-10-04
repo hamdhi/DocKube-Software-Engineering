@@ -13,7 +13,7 @@ import json
 import devops_tools
 import learning_index
 from docs_content import COMMAND_PREFIXES, EXTRA_DOCS
-from learning import LearningWindow
+from learning import LearningWindow, SIDEBAR_WIDTH
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -97,9 +97,14 @@ class App(ctk.CTk):
         self.minsize(360, 540)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
+        # Give the nav column a real minimum width; without it the scrollable
+        # frame has zero width to draw its scrollbar in.
+        self.grid_columnconfigure(0, minsize=SIDEBAR_WIDTH)
         # Sidebar
-        self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.sidebar = ctk.CTkFrame(self, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_rowconfigure(1, weight=1)
+        self.sidebar.grid_columnconfigure(0, weight=1)
         self.categories = [
             "Dashboard", "Docker", "Minikube/Kind", "Pods", "Deployments",
             "Services", "ReplicaSets", "StatefulSets", "Volumes & PVC",
@@ -107,15 +112,22 @@ class App(ctk.CTk):
             "GitHub", "Jenkins", "Terraform", "Ansible", "Port Manager",
             "Custom", "Networking Masterclass"
         ]
-        # Push the spacer below every button so the last one keeps its height.
-        self.sidebar.grid_rowconfigure(len(self.categories) + 1, weight=1)
-        ctk.CTkLabel(self.sidebar, text="DocKube", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=20, pady=(20,10))
+        ctk.CTkLabel(self.sidebar, text="DocKube",
+                     font=ctk.CTkFont(size=20, weight="bold")).grid(
+            row=0, column=0, padx=20, pady=(20, 10), sticky="w")
+        # The category list is taller than a short window, so it must scroll
+        # rather than silently hiding the last few buttons.
+        self.nav = ctk.CTkScrollableFrame(
+            self.sidebar, fg_color="transparent",
+            scrollbar_button_color="#30363d",
+            scrollbar_button_hover_color="#484f58")
+        self.nav.grid(row=1, column=0, sticky="nsew", padx=(4, 2), pady=(0, 8))
         self.sidebar_buttons = {}
         for i, cat in enumerate(self.categories):
-            btn = ctk.CTkButton(self.sidebar, text=cat, fg_color="transparent",
+            btn = ctk.CTkButton(self.nav, text=cat, fg_color="transparent",
                                 text_color=("gray10","gray90"), hover_color=("gray70","gray30"),
                                 anchor="w", command=lambda c=cat: self.select_category(c))
-            btn.grid(row=i+1, column=0, padx=20, pady=5, sticky="ew")
+            btn.grid(row=i, column=0, padx=16, pady=5, sticky="ew")
             self.sidebar_buttons[cat] = btn
         # Main area
         self.main = ctk.CTkFrame(self)
@@ -365,6 +377,9 @@ class App(ctk.CTk):
         self.compact_layout = use_compact
         if use_compact:
             self.sidebar.grid_remove()
+            # The column must collapse too, otherwise a hidden sidebar leaves
+            # a 200px gap down the left of a narrow window.
+            self.grid_columnconfigure(0, minsize=0)
             self.main.grid_configure(column=0, padx=8, pady=8)
             self.category_picker.configure(width=145)
             self.cmd_preview.configure(width=280)
@@ -379,6 +394,7 @@ class App(ctk.CTk):
             self.terminal.set_output_collapsed(True)
         else:
             self.sidebar.grid()
+            self.grid_columnconfigure(0, minsize=SIDEBAR_WIDTH)
             self.main.grid_configure(column=1, padx=20, pady=20)
             self.category_picker.configure(width=190)
             self.cmd_preview.configure(width=800)

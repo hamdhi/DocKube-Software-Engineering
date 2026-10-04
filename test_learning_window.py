@@ -52,7 +52,7 @@ expected = len(learning_index.CHAPTERS) + 1
 print("TOC buttons:", len(window._toc_buttons))
 assert len(window._toc_buttons) == expected, "TOC is incomplete"
 
-# Count real table widgets rendered inside the popup.
+
 def find_tables(widget):
     found = []
     for child in widget.winfo_children():
@@ -61,38 +61,61 @@ def find_tables(widget):
         found.extend(find_tables(child))
     return found
 
-tables = find_tables(window.outer)
-expected_tables = sum(
-    len([b for b in learning.parse_content(body) if b.kind == "table"])
-    for _title, body in [("Start Here", learning_index.INTRO)] + learning_index.CHAPTERS
-)
-print(f"table widgets rendered: {len(tables)} (expected {expected_tables})")
-assert len(tables) == expected_tables, "some tables did not become widgets"
-assert len(tables) > 40, "expected a large number of tables"
 
-# Every table must hold real cell values, not leftover markdown rows.
+# Only the selected chapter is rendered, so every chapter has to be visited to
+# prove all of its tables become real widgets.
+chapters = [("Start Here", learning_index.INTRO)] + list(learning_index.CHAPTERS)
+expected_per_chapter = {
+    title: len([b for b in learning.parse_content(body) if b.kind == "table"])
+    for title, body in chapters
+}
+total_expected = sum(expected_per_chapter.values())
+print(f"tables across all chapters: {total_expected}")
+
+# Cell text now lives on the canvas, not on child labels.
+def table_texts(table):
+    texts = []
+    for item in table.canvas.find_all():
+        if table.canvas.type(item) == "text":
+            texts.append(table.canvas.itemcget(item, "text"))
+    return texts
+
+
 # Pipes are legitimate here (PowerShell pipelines, `ls -l` output), so check
 # for genuine leftovers instead: the `|---|` divider or padded pipe rows.
 cells = 0
 broken = []
-for table in tables:
-    for child in table.winfo_children():
-        cells += 1
-        if child.winfo_class() != "Label":
-            continue
-        text = str(child.cget("text"))
-        if re.search(r"\|\s*-{2,}", text):
-            broken.append(text)
-print(f"table cells: {cells}, leftover markdown rows: {len(broken)}")
-for text in broken[:5]:
-    print("   ", text)
+missing = []
+for index, (title, _body) in enumerate(chapters):
+    window.show_chapter(index)
+    app.update()
+    tables = find_tables(window.outer)
+    if len(tables) != expected_per_chapter[title]:
+        missing.append((title, len(tables), expected_per_chapter[title]))
+    for table in tables:
+        values = table_texts(table)
+        cells += len(values)
+        for text in values:
+            if re.search(r"\|\s*-{2,}", text):
+                broken.append((title, text))
+
+print(f"table cells rendered across all chapters: {cells}, "
+      f"leftover markdown rows: {len(broken)}")
+for title, text in broken[:5]:
+    print("   ", title, text)
 assert not broken, "some cells still contain markdown table syntax"
+for entry in missing:
+    print("   table count mismatch:", entry)
+assert not missing, "some chapters did not render all of their tables"
+assert total_expected > 40, "expected a large number of tables"
 
 # Spot-check that real values survived, including one with a pipe in it.
-first = tables[0]
-values = [c.cget("text") for c in first.winfo_children()]
+window.show_chapter(0)
+app.update()
+first = find_tables(window.outer)[0]
+values = table_texts(first)
 print("first table header:", values[:4])
-assert "What you get" in values
+assert any("What you get" in v for v in values)
 
 # Navigation across every chapter must not raise.
 for index in range(expected):
