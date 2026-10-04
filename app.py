@@ -8,6 +8,10 @@ import re
 import webbrowser
 import csv
 import io
+
+import devops_tools
+from docs_content import COMMAND_PREFIXES, EXTRA_DOCS
+
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -93,14 +97,16 @@ class App(ctk.CTk):
         # Sidebar
         self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
-        self.sidebar.grid_rowconfigure(20, weight=1)
-        ctk.CTkLabel(self.sidebar, text="DocKube", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=20, pady=(20,10))
         self.categories = [
             "Dashboard", "Docker", "Minikube/Kind", "Pods", "Deployments",
             "Services", "ReplicaSets", "StatefulSets", "Volumes & PVC",
             "MySQL", "Postgres", "MongoDB", "CI/CD & GitHub Actions",
-            "Jenkins", "Terraform", "Ansible", "Port Manager", "Custom", "Networking Masterclass"
+            "GitHub", "Jenkins", "Terraform", "Ansible", "Port Manager",
+            "Custom", "Networking Masterclass"
         ]
+        # Push the spacer below every button so the last one keeps its height.
+        self.sidebar.grid_rowconfigure(len(self.categories) + 1, weight=1)
+        ctk.CTkLabel(self.sidebar, text="DocKube", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=20, pady=(20,10))
         self.sidebar_buttons = {}
         for i, cat in enumerate(self.categories):
             btn = ctk.CTkButton(self.sidebar, text=cat, fg_color="transparent",
@@ -157,6 +163,7 @@ class App(ctk.CTk):
         self.service_combo = None
         self.service_options = []
         self.ports_tree = None
+        self.ports_frame = None
         self.port_records = {}
         self.compact_layout = False
         self.configure_content_rows(True)
@@ -1032,6 +1039,8 @@ schema = graphene.Schema(query=Query)
 # ```
 # """
         }
+        # Replace the short placeholder entries with the full guides.
+        self.docs.update(EXTRA_DOCS)
         self.bind("<Configure>", self.update_responsive_layout)
         self.select_category("Dashboard")
     # ------------------------------------------------------------------
@@ -1044,7 +1053,10 @@ schema = graphene.Schema(query=Query)
         if self.category_picker.get() != cat:
             self.category_picker.set(cat)
         for w in self.actions.winfo_children():
+            # PortManagerFrame.destroy cancels its auto-refresh timer first.
             w.destroy()
+        self.ports_tree = None
+        self.ports_frame = None
         self.display_documentation(cat, self.docs.get(cat, f"Details for {cat} will appear here."))
         self.cmd_preview.delete(0, ctk.END)
         if cat == "Dashboard":
@@ -1084,10 +1096,19 @@ schema = graphene.Schema(query=Query)
             self.add_yaml_apply()
             self.add_list_ui("kubectl get pvc -A", "PVC")
         elif cat in ["MySQL", "Postgres", "MongoDB"]:
-            self.add_yaml_apply()
+            devops_tools.add_database_tools(self, cat)
         elif cat == "CI/CD & GitHub Actions":
-            self.add_cmd_button("Git Status", "git status")
-            self.add_cmd_button("Show Workflows", "cat .github/workflows/*.yml")
+            devops_tools.add_cicd_tools(self)
+        elif cat == "GitHub":
+            devops_tools.add_github_tools(self)
+        elif cat == "Jenkins":
+            devops_tools.add_jenkins_tools(self)
+        elif cat == "Terraform":
+            devops_tools.add_terraform_tools(self)
+        elif cat == "Ansible":
+            devops_tools.add_ansible_tools(self)
+        elif cat == "Port Manager":
+            devops_tools.add_port_manager(self)
         elif cat == "Custom":
             self.add_custom_input()
         else:
@@ -1101,13 +1122,16 @@ schema = graphene.Schema(query=Query)
         for raw_line in content.splitlines():
             line = re.sub(r"<[^>]+>", "", raw_line).strip()
             line = re.sub(r"\*\*(.*?)\*\*", r"\1", line)
+            # Measure indentation before stripping, otherwise indented
+            # commands such as "    terraform init" lose their colour.
+            indented = len(raw_line) - len(raw_line.lstrip()) >= 4
             if not line:
                 self.doc_text.insert("end", "\n")
             elif line.startswith(("Key ", "Important ", "Common ", "Typical ", "Types:", "Key concepts:", "Key fields:")) or line.endswith(":"):
                 self.doc_text.insert("end", f"{line}\n", "heading")
             elif line.startswith(("- ", "• ")):
                 self.doc_text.insert("end", f"• {line[2:]}\n", "bullet")
-            elif line.startswith(("kubectl ", "docker ", "minikube ", "kind ", "git ", "actions/")) or line.startswith("    "):
+            elif line.startswith(COMMAND_PREFIXES) or indented:
                 self.doc_text.insert("end", f"{line}\n", "command")
             else:
                 self.doc_text.insert("end", f"{line}\n")
