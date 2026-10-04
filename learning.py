@@ -414,6 +414,31 @@ class LearningWindow(ctk.CTkToplevel):
         TableWidget(holder, rows).pack(fill="x", expand=True)
         return row + 1
 
+    def _scroll_to(self, widget):
+        """Scroll so ``widget`` sits near the top of the content pane.
+
+        The fraction must come from the canvas scrollregion, not a guessed
+        constant: the document is far taller than the visible window, so a
+        fixed divisor overshoots and lands on blank space.
+        """
+        self.update_idletasks()
+        canvas = getattr(self.outer, "_parent_canvas", None)
+        if canvas is None:
+            return
+        canvas.update_idletasks()
+        region = canvas.cget("scrollregion")
+        try:
+            total = float(region.split()[3])
+        except (IndexError, ValueError):
+            return
+        if total <= 0:
+            return
+        # yview() returns (first, last) as fractions of the document.
+        offset = canvas.yview()[0] * total
+        target = widget.winfo_y()
+        fraction = (target - offset) / total
+        canvas.yview_moveto(min(1.0, max(0.0, fraction)))
+
     def show_chapter(self, index):
         """Scroll the content pane so the requested chapter is in view."""
         for number, button in self._toc_buttons.items():
@@ -421,10 +446,7 @@ class LearningWindow(ctk.CTkToplevel):
                 fg_color="#1f6feb" if number == index else "transparent")
         for number, widget in self._section_marks:
             if number == index:
-                self.update_idletasks()
-                canvas = getattr(self.outer, "_parent_canvas", None)
-                if canvas is not None:
-                    canvas.yview_moveto(max(0.0, widget.winfo_y() / 1000.0 - 0.02))
+                self._scroll_to(widget)
                 self.status.configure(
                     text=f"Chapter {index + 1} of {len(self.chapters)}")
                 return

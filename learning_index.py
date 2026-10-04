@@ -11,7 +11,9 @@ import learning_content_net4 as net4
 import learning_content_net5 as net5
 import learning_content_net6 as net6
 import learning_content_net7 as net7
+import learning_content_linux as linux
 import learning_content_se as se
+import learning_content_sysadmin as sysadmin
 import learning_content_devops as devops
 
 CHAPTERS = [
@@ -22,7 +24,9 @@ CHAPTERS = [
     ("TCP vs UDP", net5.CHAPTER),
     ("Protocols: DNS, HTTP, SSH, TLS", net6.CHAPTER),
     ("Network Devices", net7.CHAPTER),
+    ("Linux Command Line", linux.CHAPTER),
     ("Software Engineering", se.CHAPTER),
+    ("Sysadmin: Linux and Windows", sysadmin.CHAPTER),
     ("DevOps and Cloud", devops.CHAPTER),
 ]
 
@@ -47,8 +51,12 @@ the same shape, so you always know what comes next:</p>
 exercises, they matter more than the reading.</li>
 <li><strong>Know the basics, want depth?</strong> Chapters 5 to 7 cover protocols
 and devices that most people half-understand.</li>
-<li><strong>A developer new to DevOps?</strong> Chapters 8 and 9, then come back to
-2 and 3 so IP and subnetting are solid.</li>
+<li><strong>Learning Linux?</strong> Chapter 8 takes the command line from
+navigation through permissions, pipes and services.</li>
+<li><strong>A developer new to DevOps?</strong> Chapters 8 to 11, then return to
+chapters 2 and 3 so IP and subnetting are solid.</li>
+<li><strong>Managing Windows servers?</strong> Chapter 10 shows every command
+side by side with its Linux equivalent.</li>
 </ul>
 
 <h3>How to actually learn this</h3>

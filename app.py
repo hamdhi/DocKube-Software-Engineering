@@ -193,9 +193,11 @@ class App(ctk.CTk):
             "Custom": "Enter any free‑form command you want to run – useful for resources not covered by the built‑in shortcuts, such as `ReplicationController` or custom `kubectl` plugins.",
             "Networking Masterclass": (
                 "Open the Learning Centre for the full study guide.\n\n"
-                "Nine chapters covering networking fundamentals, IP addresses, "
-                "subnetting, ports, TCP vs UDP, protocols, network devices, "
-                "software engineering and DevOps.\n\n"
+                f"{len(learning_index.CHAPTERS)} chapters covering networking "
+                "fundamentals, IP addresses, subnetting, ports, TCP vs UDP, "
+                "protocols, network devices, the Linux command line and "
+                "permissions, software engineering, Linux and Windows "
+                "sysadmin, and DevOps.\n\n"
                 "Every chapter explains the theory in plain English, shows "
                 "the real commands, gives memory tricks, includes a "
                 "Learning vs Production comparison, and ends with an "
@@ -295,9 +297,9 @@ class App(ctk.CTk):
         ).pack(fill="x", padx=10, pady=(0, 10))
         ctk.CTkLabel(
             frm,
-            text="Nine chapters, fully explained, with real commands,\n"
-                 "memory tricks, Learning vs Production tables and\n"
-                 "hands-on exercises you can run on this machine.",
+            text=f"{len(learning_index.CHAPTERS)} chapters, fully explained, with\n"
+                 "real commands, memory tricks, Learning vs Production\n"
+                 "tables and hands-on exercises you can run here.",
             text_color=("gray40", "gray60"), anchor="w", justify="left"
         ).pack(fill="x", padx=10, pady=(0, 10))
     # ------------------------------------------------------------------

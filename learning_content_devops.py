@@ -149,28 +149,10 @@ and the repository. <code>git add</code> moves it to staging,
 <p><strong>Memory trick:</strong> logs tell you <b>what</b>, metrics tell you
 <b>whether to worry</b>, traces tell you <b>where</b>. You need all three.</p>
 
-<h2>10. Linux Commands Worth Memorising</h2>
+<h2>10. Learning vs Production</h2>
 
-<pre># Files and navigation
-ls -la          cd ..           pwd
-cat file        less file       head -n 20 file
-grep -r "text" .                find . -name "*.log"
-tail -f app.log
-
-# Permissions: owner, group, others
-chmod 644 file  chown user:group file
-
-# Processes
-ps aux          top             kill -9 PID
-systemctl status nginx
-
-# Disk and network
-df -h           free -h
-ss -tulnp       curl -v https://site.com
-
-# Flag meanings: -r recursive, -i case-insensitive, -n line numbers</pre>
-
-<h2>11. Learning vs Production</h2>
+<p>Linux command line skills are covered in full in the Linux Command Line chapter.
+The habits that matter most when applying them to infrastructure are below.</p>
 
 <table>
 <tr><th>Aspect</th><th>While learning</th><th>In production</th></tr>
@@ -185,7 +167,7 @@ ss -tulnp       curl -v https://site.com
 <tr><td>Monitoring</td><td>Staring at a terminal</td><td>Dashboards, alerts, and someone paged</td></tr>
 </table>
 
-<h2>12. Key Takeaways</h2>
+<h2>11. Key Takeaways</h2>
 <ul>
 <li>DevOps means developers own their code in production.</li>
 <li>An image is a template; a container is a running instance of it.</li>
