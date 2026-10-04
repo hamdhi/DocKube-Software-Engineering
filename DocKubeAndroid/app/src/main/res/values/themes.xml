@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose paints everything; this only styles the window before the
+         first frame, so the launch does not flash white. -->
+    <style name="Theme.DocKube" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#161B22</item>
+        <item name="android:navigationBarColor">#0D1117</item>
+        <item name="android:windowBackground">#0D1117</item>
+    </style>
+</resources>

@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A stylised hex pod, echoing the Kubernetes mark without copying it. -->
+    <path
+        android:fillColor="#58A6FF"
+        android:pathData="M54,28 L78,41 L78,67 L54,80 L30,67 L30,41 Z" />
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M54,36 L70,45 L70,63 L54,72 L38,63 L38,45 Z" />
+    <path
+        android:fillColor="#58A6FF"
+        android:pathData="M54,45 L62,50 L62,59 L54,64 L46,59 L46,50 Z" />
+</vector>

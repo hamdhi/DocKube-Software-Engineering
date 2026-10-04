@@ -1,0 +1,7 @@
+# Ignore Gradle's machine-specific state.
+.gradle/
+build/
+local.properties
+
+# The phone APK is a build output, not source.
+*.apk
