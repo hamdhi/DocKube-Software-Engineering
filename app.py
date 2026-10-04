@@ -9,13 +9,27 @@ import webbrowser
 import csv
 import io
 import json
+import queue
 
 import devops_tools
 import learning_index
 from docs_content import COMMAND_PREFIXES, EXTRA_DOCS
 from learning import LearningWindow, SIDEBAR_WIDTH
+from fast_scroller import FastScroller
+from shared_console import SharedTerminal
 
 ctk.set_appearance_mode("Dark")
+
+
+def _solid_color(color):
+    """Resolve a CustomTkinter colour pair to one hex string.
+
+    CustomTkinter returns ``("#light", "#dark")`` tuples for many options, which
+    plain tkinter widgets cannot use.
+    """
+    if isinstance(color, (list, tuple)):
+        return color[1] if ctk.get_appearance_mode() == "Dark" else color[0]
+    return color
 ctk.set_default_color_theme("blue")
 
 class TerminalFrame(ctk.CTkFrame):
@@ -95,6 +109,9 @@ class App(ctk.CTk):
         self.title("DocKube Software Engineer")
         self.geometry("1100x720")
         self.minsize(360, 540)
+        # Shut the shared prompt down when the window closes, rather than
+        # leaving an orphaned cmd.exe behind.
+        self.protocol("WM_DELETE_WINDOW", self._shutdown)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
         # Give the nav column a real minimum width; without it the scrollable
@@ -104,7 +121,10 @@ class App(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_rowconfigure(1, weight=1)
-        self.sidebar.grid_columnconfigure(0, weight=1)
+        # weight=0 keeps the sidebar at SIDEBAR_WIDTH. With weight=1 this column
+        # claimed every spare pixel and the sidebar grew to ~400px, leaving the
+        # category buttons floating at the left of a wide empty strip.
+        self.sidebar.grid_columnconfigure(0, weight=0, minsize=SIDEBAR_WIDTH)
         self.categories = [
             "Dashboard", "Docker", "Minikube/Kind", "Pods", "Deployments",
             "Services", "ReplicaSets", "StatefulSets", "Volumes & PVC",
@@ -117,17 +137,31 @@ class App(ctk.CTk):
             row=0, column=0, padx=20, pady=(20, 10), sticky="w")
         # The category list is taller than a short window, so it must scroll
         # rather than silently hiding the last few buttons.
-        self.nav = ctk.CTkScrollableFrame(
-            self.sidebar, fg_color="transparent",
-            scrollbar_button_color="#30363d",
-            scrollbar_button_hover_color="#484f58")
-        self.nav.grid(row=1, column=0, sticky="nsew", padx=(4, 2), pady=(0, 8))
+        self.nav_scroller = FastScroller(
+            self.sidebar, bg=_solid_color(self.sidebar.cget("fg_color")))
+        self.nav_scroller.grid(row=1, column=0, sticky="nsew", padx=(4, 2),
+                               pady=(0, 8))
+        # Callers keep adding children to self.nav, so point it at the
+        # scroller's inner frame rather than the scroller itself.
+        self.nav = self.nav_scroller.body
         self.sidebar_buttons = {}
+        # Plain tk.Button rather than CTkButton. Building 20 CustomTkinter
+        # buttons took roughly 700 ms of the app's startup, because each one
+        # is really a frame, two canvases and a label. The nav is flat and has
+        # no per-item state, so a tk button renders identically for a fraction
+        # of the cost.
+        nav_bg = _solid_color(self.sidebar.cget("fg_color"))
+        nav_hover = "#3a3a3a" if ctk.get_appearance_mode() == "Dark" else "#dcdcdc"
+        nav_text = "#d4d4d4" if ctk.get_appearance_mode() == "Dark" else "#1c1c1c"
         for i, cat in enumerate(self.categories):
-            btn = ctk.CTkButton(self.nav, text=cat, fg_color="transparent",
-                                text_color=("gray10","gray90"), hover_color=("gray70","gray30"),
-                                anchor="w", command=lambda c=cat: self.select_category(c))
-            btn.grid(row=i, column=0, padx=16, pady=5, sticky="ew")
+            btn = tk.Button(
+                self.nav, text=cat, anchor="w", relief="flat", bd=0,
+                highlightthickness=0, background=nav_bg, activebackground=nav_hover,
+                foreground=nav_text, activeforeground=nav_text,
+                font=("Segoe UI", 11), width=20, padx=8, pady=6,
+                cursor="hand2",
+                command=lambda c=cat: self.select_category(c))
+            btn.grid(row=i, column=0, padx=6, pady=1, sticky="ew")
             self.sidebar_buttons[cat] = btn
         # Main area
         self.main = ctk.CTkFrame(self)
@@ -159,27 +193,46 @@ class App(ctk.CTk):
         self.work_dir_entry = ctk.CTkEntry(self.main, width=600)
         self.work_dir_entry.insert(0, os.getcwd())
         self.work_dir_entry.grid(row=3, column=1, padx=20, pady=2, sticky="ew")
-        # External terminal button
-        self.ext_btn = ctk.CTkButton(self.main, text="Run in External Terminal", command=lambda: self.run_in_external_terminal(self.cmd_preview.get()))
+        # Controls for the single shared terminal.
+        self.ext_btn = ctk.CTkButton(
+            self.main, text="Send to Terminal",
+            command=lambda: self.run_in_external_terminal(self.cmd_preview.get()))
         self.ext_btn.grid(row=2, column=1, padx=10, pady=5, sticky="w")
-        # Toggle controlling whether every run also pops open a cmd.exe window.
+        # Toggle controlling whether runs go to the shared terminal at all.
         self.open_terminal_on_run = self._load_pref("open_terminal_on_run", True)
         self.terminal_toggle = ctk.CTkSwitch(
-            self.main, text="Open a terminal for each command",
+            self.main, text="Run commands in the shared terminal",
             command=self._toggle_terminal_pref)
         if self.open_terminal_on_run:
             self.terminal_toggle.select()
         # Row 8 is below the actions (4 or 6) and terminal (5 or 7) frames used
-        # by both layouts, so the toggle never collides with either.
-        self.terminal_toggle.grid(row=8, column=0, columnspan=2, padx=20,
-                                  pady=(0, 6), sticky="w")
-        self.actions = ctk.CTkScrollableFrame(self.main)
-        self.actions.grid(row=4, column=0, columnspan=2, padx=20, pady=5, sticky="nsew")
+        # by both layouts, so these controls never collide with either.
+        self.terminal_toggle.grid(row=8, column=0, padx=20, pady=(0, 6),
+                                  sticky="w")
+        self.open_console_btn = ctk.CTkButton(
+            self.main, text="Open Terminal", width=110,
+            command=self.open_shared_console)
+        self.open_console_btn.grid(row=8, column=1, padx=(8, 20), pady=(0, 6),
+                                   sticky="e")
+        self.status_label = ctk.CTkLabel(self.main, text="",
+                                         text_color="#8b949e", anchor="e")
+        self.status_label.grid(row=9, column=0, columnspan=2, padx=20,
+                               pady=(0, 4), sticky="ew")
+        self.actions_scroller = FastScroller(
+            self.main, bg=_solid_color(self.main.cget("fg_color")))
+        self.actions_scroller.grid(row=4, column=0, columnspan=2, padx=20,
+                                   pady=5, sticky="nsew")
+        # Everything that builds a category panel adds children to
+        # self.actions, so keep that name pointing at the inner frame.
+        self.actions = self.actions_scroller.body
         self.actions.grid_columnconfigure(0, weight=1)
         self.terminal = TerminalFrame(self.main)
         self.terminal.grid(row=5, column=0, columnspan=2, padx=20, pady=5, sticky="nsew")
         self.terminal.set_output_collapsed(True)
         self.terminal.on_output_visibility_changed = self.configure_content_rows
+        # Start pulling shared-prompt output into the widget. Scheduled from
+        # here, on the Tk thread, so the reader thread never calls after().
+        self._drain_id = self.after(50, self._drain_output)
         self.main.grid_rowconfigure(4, weight=1)
         # State helpers
         self.last_items = []   # list of (namespace, name)
@@ -193,6 +246,16 @@ class App(ctk.CTk):
         self.port_records = {}
         self.learning_window = None
         self.compact_layout = False
+        # One prompt for the whole app, reused by every command.
+        #
+        # The reader thread must never touch Tk. Calling after() from another
+        # thread blocks whenever the main thread is inside update(), which
+        # froze the reader and stalled the shared prompt mid-queue. So the
+        # thread only drops lines into a queue and _drain_output, which runs on
+        # the Tk thread, empties it.
+        self._output_queue = queue.Queue()
+        self.console = SharedTerminal(on_output=self._output_queue.put)
+        self.status_label = None
         self.configure_content_rows(True)
         # Detailed documentation snippets for DevOps concepts and YAML field guidance
         self.docs = {
@@ -389,7 +452,7 @@ class App(ctk.CTk):
             self.ext_btn.grid_configure(row=3, column=0, columnspan=2, padx=12, sticky="w")
             self.work_dir_label.grid_configure(row=4, column=0, columnspan=2, padx=12, sticky="w")
             self.work_dir_entry.grid_configure(row=5, column=0, columnspan=2, padx=12, sticky="ew")
-            self.actions.grid_configure(row=6, column=0, columnspan=2, padx=12, sticky="nsew")
+            self.actions_scroller.grid_configure(row=6, column=0, columnspan=2, padx=12, sticky="nsew")
             self.terminal.grid_configure(row=7, column=0, columnspan=2, padx=12, sticky="nsew")
             self.terminal.set_output_collapsed(True)
         else:
@@ -404,7 +467,7 @@ class App(ctk.CTk):
             self.ext_btn.grid_configure(row=2, column=1, columnspan=1, padx=10, sticky="w")
             self.work_dir_label.grid_configure(row=3, column=0, columnspan=1, padx=20, sticky="w")
             self.work_dir_entry.grid_configure(row=3, column=1, columnspan=1, padx=20, sticky="ew")
-            self.actions.grid_configure(row=4, column=0, columnspan=2, padx=20, sticky="nsew")
+            self.actions_scroller.grid_configure(row=4, column=0, columnspan=2, padx=20, sticky="nsew")
             self.terminal.grid_configure(row=5, column=0, columnspan=2, padx=20, sticky="nsew")
         self.configure_content_rows(self.terminal.output_collapsed)
         self.resize_terminal(event.height)
@@ -415,7 +478,7 @@ class App(ctk.CTk):
     def configure_content_rows(self, output_collapsed):
         """Give section controls the remaining space and scroll them when needed."""
         actions_row = 6 if self.compact_layout else 4
-        for row in range(8):
+        for row in range(10):
             self.main.grid_rowconfigure(row, weight=0)
         self.main.grid_rowconfigure(actions_row, weight=1)
         if not output_collapsed:
@@ -476,11 +539,25 @@ class App(ctk.CTk):
         # None means "follow the user's in-app toggle"; True or False overrides it.
         if open_external is None:
             open_external = self.open_terminal_on_run
+
+        # A caller that parses the output needs it captured here, so those
+        # commands run in this process. Sending them to the shared console as
+        # well would run them twice, which matters for anything destructive.
+        if callback is not None:
+            self._capture_output(cmd, callback)
+            return
+
         if open_external:
             self.run_in_external_terminal(cmd)
+        else:
+            self._capture_output(cmd, None)
+
+    def _capture_output(self, cmd, callback):
+        """Run a command here and stream its output into the app."""
+        directory = self._work_dir()
         def task():
             try:
-                proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=self.work_dir_entry.get())
+                proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=directory)
                 out = []
                 for line in proc.stdout:
                     self.after(0, self.terminal.append_output, line)
@@ -491,15 +568,91 @@ class App(ctk.CTk):
             except Exception as e:
                 self.after(0, self.terminal.append_output, f"\nError: {e}\n")
         threading.Thread(target=task, daemon=True).start()
+
+    def _work_dir(self):
+        try:
+            return os.path.abspath(os.path.expanduser(
+                self.work_dir_entry.get().strip()))
+        except Exception:
+            return os.getcwd()
+
     # ------------------------------------------------------------------
     def run_in_external_terminal(self, cmd):
-        """Launch the command in a new interactive Windows terminal."""
+        """Run ``cmd`` in the one shared prompt every other command uses.
+
+        There is deliberately a single prompt for the whole app: opening a new
+        cmd.exe per command buried the user in windows. Commands are queued so
+        their output cannot interleave, and the prompt keeps its state between
+        them.
+        """
+        if not cmd or not cmd.strip():
+            return False
+        started = self.console.run(cmd, cwd=self._work_dir())
+        if started:
+            # The reader thread streams this command's output into the widget,
+            # so open it up rather than leaving it collapsed.
+            self.terminal.set_output_collapsed(False)
+            self.set_status(f"Shared terminal: {cmd}")
+        else:
+            # The prompt could not be started, so run it here rather than
+            # silently doing nothing.
+            self.terminal.append_output(
+                "\nCould not start the shared terminal; running here instead.\n")
+            self._capture_output(cmd, None)
+        return started
+
+    def _drain_output(self):
+        """Move queued prompt output into the terminal widget.
+
+        Runs on the Tk thread via after(), which is the only thread allowed to
+        touch widgets. Batching keeps a chatty command from starving the event
+        loop, and the cap stops one huge burst from blocking for seconds.
+        """
+        appended = False
+        for _ in range(200):
+            try:
+                line = self._output_queue.get_nowait()
+            except queue.Empty:
+                break
+            self.terminal.append_output(line)
+            appended = True
+        if appended:
+            self.terminal.textbox.see("end")
+        self._drain_id = self.after(50, self._drain_output)
+
+    def open_shared_console(self):
+        """Start the shared prompt on demand, without running anything."""
+        if self.console.ensure_open(cwd=self._work_dir()):
+            self.terminal.set_output_collapsed(False)
+            self.terminal.append_output("Shared terminal ready.\n")
+            self.set_status("Shared terminal started")
+        else:
+            self.set_status("Could not start the shared terminal")
+
+    def close_shared_console(self):
+        self.console.close()
+        self.set_status("Shared terminal stopped")
+
+    def _shutdown(self):
+        """Close the shared prompt before the window goes away."""
         try:
-            # /k keeps the result visible; cwd avoids fragile cmd.exe quote handling.
-            directory = os.path.abspath(os.path.expanduser(self.work_dir_entry.get().strip()))
-            subprocess.Popen(["cmd.exe", "/k", cmd], cwd=directory)
-        except Exception as e:
-            self.terminal.append_output(f"\nError launching external terminal: {e}\n")
+            self.console.close()
+        except Exception:
+            pass
+        # Cancel the recurring drain first, otherwise its pending after() fires
+        # against a destroyed interpreter and prints Tcl errors on the way out.
+        try:
+            self.after_cancel(self._drain_id)
+        except Exception:
+            pass
+        self.destroy()
+
+    def set_status(self, message):
+        """Show a short-lived message under the command area."""
+        if not getattr(self, "status_label", None):
+            return
+        self.status_label.configure(text=message)
+        self.after(6000, lambda: self.status_label.configure(text=""))
     def add_cmd_button(self, label, cmd):
         btn = ctk.CTkButton(self.actions, text=label, command=lambda: self.run_cmd(cmd))
         btn.pack(pady=4, anchor="w", padx=5)

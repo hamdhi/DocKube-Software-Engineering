@@ -77,43 +77,67 @@ if launched != ["echo four"]:
     failures.append(f"open_external=True was ignored: {launched}")
 print("explicit overrides honoured: True/False")
 
-# --- the real launcher must use cmd.exe /k so output stays visible ---
+# --- one shared prompt for every command, never a window per command ------
+# The session is stubbed so the test never starts a real cmd.exe, and the real
+# run_in_external_terminal is restored so it is the code under test.
 app.run_in_external_terminal = mod.App.run_in_external_terminal.__get__(app)
-directory = tempfile.mkdtemp(prefix="dockeybe_cwd_")
-app.work_dir_entry.delete(0, "end")
-app.work_dir_entry.insert(0, directory)
+sent = []
+app.console.run = lambda cmd, cwd=None, callback=None: sent.append(cmd) or True
 
-real = []
-original_popen = subprocess.Popen
-subprocess.Popen = lambda args, **kwargs: real.append((args, kwargs))
-try:
-    app.run_in_external_terminal("echo visible")
-finally:
-    subprocess.Popen = original_popen
+sent.clear()
+app.run_in_external_terminal("echo one")
+app.run_in_external_terminal("echo two")
+app.run_in_external_terminal("echo three")
+print("commands sent to the shared prompt:", sent)
+if sent != ["echo one", "echo two", "echo three"]:
+    failures.append(f"shared prompt did not receive every command: {sent}")
 
-print("real launcher call:", real)
-if not real:
-    failures.append("run_in_external_terminal spawned nothing")
-else:
-    args, kwargs = real[0]
-    if args[0].lower().endswith("cmd.exe") and args[1].lower() != "/k":
-        failures.append(f"expected cmd.exe /k so output stays visible, got {args}")
-    if "cwd" not in kwargs:
-        failures.append("launcher did not pass a cwd")
+# A single SharedTerminal instance must serve the whole app.
+from shared_console import SharedTerminal
 
-# run_cmd also starts a worker thread that reads the command output and posts
-# it back with after(). Those threads touch Tk, so the main loop has to keep
-# running until they are done; otherwise they complain once the widgets are
-# destroyed.
-def settle(seconds=1.5):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        app.update()
-        time.sleep(0.02)
+if not isinstance(app.console, SharedTerminal):
+    failures.append("app is not using a SharedTerminal")
+
+# --- commands that parse their own output must not run twice -------------
+# fetch_items / fetch_service_options pass a callback and rely on the captured
+# output, so they must run in-process and never reach the shared prompt.
+captured = []
+original_capture = app._capture_output
+app._capture_output = lambda cmd, callback: captured.append((cmd, callback))
 
 
-settle()
-app.destroy()
+def on_done(output):
+    pass
+
+
+sent.clear()
+captured.clear()
+app.run_cmd("kubectl get pods -A", on_done)
+if sent:
+    failures.append(f"a callback command also went to the prompt: {sent}")
+if len(captured) != 1 or captured[0][1] is not on_done:
+    failures.append(f"callback command was not captured in-process: {captured}")
+print("callback command captured in-process, not sent to the prompt")
+
+# Without a callback it goes to the shared prompt and is not run locally.
+sent.clear()
+captured.clear()
+app.run_cmd("kubectl delete pod x", open_external=True)
+if sent != ["kubectl delete pod x"]:
+    failures.append(f"plain command did not reach the prompt: {sent}")
+if captured:
+    failures.append(f"plain command also ran locally: {captured}")
+print("plain command sent to the shared prompt only")
+
+# Closing the app must shut the prompt down.
+closed = []
+app.console.close = lambda: closed.append(True)
+app._shutdown()
+if not closed:
+    failures.append("closing the app did not stop the shared prompt")
+print("shared prompt closed on shutdown:", bool(closed))
+
+app._capture_output = original_capture
 
 if failures:
     print(f"\n{len(failures)} TERMINAL TOGGLE FAILURES:")

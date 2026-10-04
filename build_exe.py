@@ -20,6 +20,8 @@ NAME = "DocKube"
 # Imported by name, so they must be handed to PyInstaller explicitly.
 HIDDEN_IMPORTS = [
     "customtkinter",
+    "fast_scroller",
+    "shared_console",
     "learning",
     "learning_index",
     "port_manager",

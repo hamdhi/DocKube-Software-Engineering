@@ -39,7 +39,7 @@ print(f"categories: {len(app.categories)}")
 print(f"nav column width: {app.grid_bbox(0, 0)[2]} px")
 
 # Every category button must live in the scrollable nav, not the fixed frame.
-assert isinstance(app.nav, mod.ctk.CTkScrollableFrame), "nav is not scrollable"
+assert isinstance(app.nav_scroller, mod.FastScroller), "nav is not scrollable"
 for category, button in app.sidebar_buttons.items():
     master = button.master
     while master is not app.sidebar:
@@ -50,22 +50,20 @@ for category, button in app.sidebar_buttons.items():
         failures.append(f"{category} is outside the scrollable nav")
 print("all category buttons live in the scrollable nav")
 
-# The scrollbar must exist and have height, otherwise it is invisible.
-bars = find_scrollbars(app.sidebar)
-print(f"scrollbars in sidebar: {len(bars)}")
-if not bars:
-    failures.append("no scrollbar was created in the dashboard sidebar")
-else:
-    bar = bars[0]
-    height = bar.winfo_height()
-    print(f"nav scrollbar height: {height} px")
-    if height <= 0:
-        failures.append("nav scrollbar has zero height, so it is invisible")
+# The scrollbar must appear and have height, or the last categories are
+# unreachable. It is a plain canvas in FastScroller, not a CTkScrollbar.
+# winfo_ismapped is always False in a withdrawn window, so check it is actually
+# managed and has a real height instead.
+bar = app.nav_scroller._bar
+app.update_idletasks()
+height = bar.winfo_height()
+managed = bar.winfo_manager()
+print(f"nav scrollbar: height={height} px, manager={managed}")
+if not managed or height <= 0:
+    failures.append("nav scrollbar is not visible")
 
 # The content must genuinely overflow, or a scrollbar would be pointless.
-# The scrollable frame's own requested height is not the content height; the
-# canvas scrollregion is.
-canvas = app.nav._parent_canvas
+canvas = app.nav_scroller.canvas
 content_h = float(canvas.cget("scrollregion").split()[3])
 visible = canvas.winfo_height()
 print(f"nav content height: {content_h:.0f} px, visible: {visible} px, "
