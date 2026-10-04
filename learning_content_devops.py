@@ -80,11 +80,24 @@ kubectl delete -f app.yaml</pre>
 <tr><td>Best for</td><td>Full OS, strong isolation, legacy apps</td><td>Microservices, scale out, fast deploys</td></tr>
 </table>
 
-<h2>5. CI/CD</h2>
+<h2>5. Where to Go Deeper</h2>
 
-<p>Continuous Integration means code is merged often and automatically checked.
-Continuous Delivery means it is always ready to ship. Continuous Deployment goes
-further and ships with no human button.</p>
+<p>The tool mechanics live in their own chapters so this chapter stays about
+mindset. Use these pointers when you need the detail.</p>
+
+<table>
+<tr><th>Topic</th><th>Go to</th><th>Why it is separate</th></tr>
+<tr><td>CI/CD pipelines, GitHub Actions</td><td>Chapter 13, Delivery Tooling</td><td>Workflow syntax, matrices, caching and runners need room</td></tr>
+<tr><td>Jenkins pipelines</td><td>Chapter 13, Delivery Tooling</td><td>Jenkinsfile, agents and plugins are a large topic</td></tr>
+<tr><td>Terraform and Ansible</td><td>Chapter 13, Delivery Tooling</td><td>State, backends, modules and roles need proper explanation</td></tr>
+<tr><td>Scrum, Agile and the SDLC</td><td>Chapter 11, SDLC, Agile and Scrum</td><td>Roles, events and artefacts deserve their own treatment</td></tr>
+<tr><td>AWS services in depth</td><td>Chapter 12, AWS</td><td>Regions, IAM, VPC, S3, EC2 and cost control</td></tr>
+<tr><td>Linux and Windows commands</td><td>Chapters 8 and 10</td><td>Full command references with permissions and services</td></tr>
+</table>
+
+<p><strong>Memory trick:</strong> this chapter answers <b>what</b> DevOps is and
+<b>why</b> it exists. Chapter 13 answers <b>how</b> to run the delivery
+pipeline.</p>
 
 <pre>gh workflow list
 gh run list --limit 10
@@ -92,36 +105,7 @@ gh run view &lt;id&gt; --log-failed
 gh workflow run deploy.yml --ref main
 act -l              # run workflows locally before pushing</pre>
 
-<h2>6. Infrastructure as Code - Terraform</h2>
-
-<p>Terraform describes the infrastructure you want, then makes reality match.
-Three commands matter: init, plan and apply.</p>
-
-<pre>terraform init
-terraform plan
-terraform apply
-terraform destroy</pre>
-
-<p><strong>Memory trick:</strong> always run <b>plan</b> and read it before
-<b>apply</b>. Plan is the rehearsal, apply is the performance.</p>
-
-<p>Terraform records what it created in state. Back state up and never edit it by
-hand.</p>
-
-<h2>7. Configuration Management - Ansible</h2>
-
-<p>Ansible connects over SSH and makes machines match a description. There is no
-agent to install.</p>
-
-<pre>ansible all -m ping
-ansible-playbook site.yml --check --diff
-ansible-playbook site.yml --syntax-check
-ansible-inventory --graph</pre>
-
-<p><strong>Memory trick:</strong> always run with <b>--check</b> first. It reports
-what would change without changing anything.</p>
-
-<h2>8. Version Control with Git</h2>
+<h2>6. Version Control with Git</h2>
 
 <p>Git tracks changes so you can experiment safely and undo anything.</p>
 
@@ -137,7 +121,7 @@ git push -u origin feature</pre>
 and the repository. <code>git add</code> moves it to staging,
 <code>git commit</code> saves it.</p>
 
-<h2>9. Observability</h2>
+<h2>7. Observability</h2>
 
 <table>
 <tr><th>Pillar</th><th>Question it answers</th><th>Examples</th></tr>
@@ -149,7 +133,7 @@ and the repository. <code>git add</code> moves it to staging,
 <p><strong>Memory trick:</strong> logs tell you <b>what</b>, metrics tell you
 <b>whether to worry</b>, traces tell you <b>where</b>. You need all three.</p>
 
-<h2>10. Learning vs Production</h2>
+<h2>8. Learning vs Production</h2>
 
 <p>Linux command line skills are covered in full in the Linux Command Line chapter.
 The habits that matter most when applying them to infrastructure are below.</p>
@@ -167,7 +151,7 @@ The habits that matter most when applying them to infrastructure are below.</p>
 <tr><td>Monitoring</td><td>Staring at a terminal</td><td>Dashboards, alerts, and someone paged</td></tr>
 </table>
 
-<h2>11. Key Takeaways</h2>
+<h2>9. Key Takeaways</h2>
 <ul>
 <li>DevOps means developers own their code in production.</li>
 <li>An image is a template; a container is a running instance of it.</li>

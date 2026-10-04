@@ -8,6 +8,7 @@ import re
 import webbrowser
 import csv
 import io
+import json
 
 import devops_tools
 import learning_index
@@ -149,6 +150,17 @@ class App(ctk.CTk):
         # External terminal button
         self.ext_btn = ctk.CTkButton(self.main, text="Run in External Terminal", command=lambda: self.run_in_external_terminal(self.cmd_preview.get()))
         self.ext_btn.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        # Toggle controlling whether every run also pops open a cmd.exe window.
+        self.open_terminal_on_run = self._load_pref("open_terminal_on_run", True)
+        self.terminal_toggle = ctk.CTkSwitch(
+            self.main, text="Open a terminal for each command",
+            command=self._toggle_terminal_pref)
+        if self.open_terminal_on_run:
+            self.terminal_toggle.select()
+        # Row 8 is below the actions (4 or 6) and terminal (5 or 7) frames used
+        # by both layouts, so the toggle never collides with either.
+        self.terminal_toggle.grid(row=8, column=0, columnspan=2, padx=20,
+                                  pady=(0, 6), sticky="w")
         self.actions = ctk.CTkScrollableFrame(self.main)
         self.actions.grid(row=4, column=0, columnspan=2, padx=20, pady=5, sticky="nsew")
         self.actions.grid_columnconfigure(0, weight=1)
@@ -400,12 +412,54 @@ class App(ctk.CTk):
         height = max(150, min(290, int(window_height * 0.40)))
         self.terminal.configure(height=height)
 
-    def run_cmd(self, cmd, callback=None, open_external=True):
+    # ------------------------------------------------------------------
+    # Small persisted preferences, stored next to the user's app data so
+    # they survive a rebuild of the executable.
+    # ------------------------------------------------------------------
+    PREF_FILE_NAME = "dockeybe_prefs.json"
+
+    @classmethod
+    def _prefs_path(cls):
+        base = os.environ.get("APPDATA") or os.path.expanduser("~")
+        folder = os.path.join(base, "DocKube")
+        os.makedirs(folder, exist_ok=True)
+        return os.path.join(folder, cls.PREF_FILE_NAME)
+
+    def _load_pref(self, key, default):
+        try:
+            with open(self._prefs_path(), "r", encoding="utf-8") as handle:
+                return json.load(handle).get(key, default)
+        except Exception:
+            return default
+
+    def _save_pref(self, key, value):
+        path = self._prefs_path()
+        prefs = {}
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                prefs = json.load(handle)
+        except Exception:
+            pass
+        prefs[key] = value
+        try:
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(prefs, handle, indent=2)
+        except Exception:
+            pass
+
+    def _toggle_terminal_pref(self):
+        self.open_terminal_on_run = bool(self.terminal_toggle.get())
+        self._save_pref("open_terminal_on_run", self.open_terminal_on_run)
+
+    def run_cmd(self, cmd, callback=None, open_external=None):
         self.terminal.clear()
         print(f"> {cmd}")
         self.terminal.append_output(f"> {cmd}\n")
         self.cmd_preview.delete(0, ctk.END)
         self.cmd_preview.insert(0, cmd)
+        # None means "follow the user's in-app toggle"; True or False overrides it.
+        if open_external is None:
+            open_external = self.open_terminal_on_run
         if open_external:
             self.run_in_external_terminal(cmd)
         def task():

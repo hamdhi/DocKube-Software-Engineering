@@ -36,6 +36,13 @@ TABLE_HEADING_BG = "#21262d"
 TABLE_STRIPE = "#1a1f27"
 TABLE_BG = "#161b22"
 
+# Slight breathing room so a chapter heading is not glued to the pane edge.
+HEADER_OFFSET = 12
+
+# Fixed width for the chapter sidebar. Setting this as a column minsize is
+# what gives the scrollable TOC a real width to draw its scrollbar in.
+SIDEBAR_WIDTH = 250
+
 
 class Block:
     """One renderable piece of a chapter."""
@@ -294,6 +301,7 @@ class LearningWindow(ctk.CTkToplevel):
     def _build(self):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, minsize=SIDEBAR_WIDTH)
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=16, pady=(12, 6))
@@ -306,7 +314,10 @@ class LearningWindow(ctk.CTkToplevel):
         ctk.CTkButton(header, text="Close", width=90, command=self.destroy).grid(
             row=0, column=3, padx=(12, 0))
 
-        sidebar = ctk.CTkFrame(self, width=250, corner_radius=0, fg_color="#0d1117")
+        # The sidebar holds a scrollable TOC. It must be able to shrink, and
+        # the TOC needs an explicit width, otherwise CustomTkinter computes a
+        # zero-width scrollbar and hides it.
+        sidebar = ctk.CTkFrame(self, fg_color="#0d1117", corner_radius=0)
         sidebar.grid(row=1, column=0, rowspan=2, sticky="nsw")
         sidebar.grid_propagate(False)
         sidebar.grid_rowconfigure(1, weight=1)
@@ -316,8 +327,10 @@ class LearningWindow(ctk.CTkToplevel):
                      font=ctk.CTkFont(weight="bold"), text_color=MUTED).grid(
             row=0, column=0, padx=14, pady=(12, 6), sticky="w")
 
-        toc = ctk.CTkScrollableFrame(sidebar, fg_color="transparent")
-        toc.grid(row=1, column=0, sticky="nsew", padx=6)
+        toc = ctk.CTkScrollableFrame(sidebar, fg_color="transparent",
+                                     scrollbar_button_color="#30363d",
+                                     scrollbar_button_hover_color="#484f58")
+        toc.grid(row=1, column=0, sticky="nsew", padx=(6, 2), pady=(0, 4))
         for index, (title, _body) in enumerate(self.chapters):
             button = ctk.CTkButton(
                 toc, text=title, anchor="w", fg_color="transparent",
@@ -417,26 +430,25 @@ class LearningWindow(ctk.CTkToplevel):
     def _scroll_to(self, widget):
         """Scroll so ``widget`` sits near the top of the content pane.
 
-        The fraction must come from the canvas scrollregion, not a guessed
-        constant: the document is far taller than the visible window, so a
-        fixed divisor overshoots and lands on blank space.
+        ``yview_moveto`` takes a fraction of the **whole** document, so the
+        target pixel offset has to be divided by the full scrollregion height.
+        Subtracting the current offset instead (an earlier mistake) only works
+        when jumping from the very top, which made the sidebar highlight one
+        chapter while the pane showed another.
         """
         self.update_idletasks()
         canvas = getattr(self.outer, "_parent_canvas", None)
         if canvas is None:
             return
         canvas.update_idletasks()
-        region = canvas.cget("scrollregion")
         try:
-            total = float(region.split()[3])
+            total = float(canvas.cget("scrollregion").split()[3])
         except (IndexError, ValueError):
             return
         if total <= 0:
             return
-        # yview() returns (first, last) as fractions of the document.
-        offset = canvas.yview()[0] * total
         target = widget.winfo_y()
-        fraction = (target - offset) / total
+        fraction = (target - HEADER_OFFSET) / total
         canvas.yview_moveto(min(1.0, max(0.0, fraction)))
 
     def show_chapter(self, index):
