@@ -72,12 +72,23 @@ else:
 
 
 def clean():
-    """Remove build and dist folders so the build starts from scratch."""
-    for folder in ("build", "dist"):
-        target = os.path.join(ROOT, folder)
-        if os.path.isdir(target):
-            print(f"removing {folder}/")
-            shutil.rmtree(target, ignore_errors=True)
+    """Remove the app bundle so a rebuild starts from scratch.
+
+    Only the application folder and PyInstaller's own build cache are removed.
+    The whole of dist/ is left alone on purpose: the APKs and the compiled
+    installer live there too, and a desktop rebuild has no business deleting
+    the mobile build.
+    """
+    for folder in (os.path.join(ROOT, "build"), os.path.join(ROOT, "dist", NAME)):
+        if os.path.isdir(folder):
+            print(f"removing {os.path.relpath(folder, ROOT)}/")
+            shutil.rmtree(folder, ignore_errors=True)
+    # A stale installer would otherwise survive and be republished with the new
+    # app files inside it.
+    setup = os.path.join(ROOT, "dist", f"{NAME}Setup.exe")
+    if os.path.isfile(setup):
+        print(f"removing dist\\{NAME}Setup.exe")
+        os.remove(setup)
 
 
 def main():

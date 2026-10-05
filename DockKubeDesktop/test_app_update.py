@@ -1,4 +1,4 @@
-r"""The self-updater must never act on a build it cannot identify.
+﻿r"""The self-updater must never act on a build it cannot identify.
 
 DocKube updates itself from a pinned GitHub tag that carries no version
 number, so the parsing that decides "is there something newer" is the part
@@ -27,6 +27,9 @@ import tempfile
 import app_update
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# The onedir bundle, used both as the thing an update mirrors over an
+# installation and as the thing the packaging checks look for.
+BUNDLE = os.path.join(HERE, "dist", "DocKube")
 
 failures = []
 
@@ -258,6 +261,39 @@ print("folder swap: exe replaced, new libraries in, stale ones removed")
 shutil.rmtree(old_install, ignore_errors=True)
 shutil.rmtree(staged_build, ignore_errors=True)
 
+# --------------------------------------- updating the real install folder
+# The promise is "update by clicking the button", which means swapping a
+# staged bundle over %LOCALAPPDATA%\Programs\DocKube while it is installed.
+# This runs that swap against a real folder-shaped stand-in, using the real
+# generated batch file, because that is the only way to know the mirror
+# actually replaces an installed application.
+installed = tempfile.mkdtemp(prefix="dockeybe_installed_")
+os.makedirs(os.path.join(installed, "_internal"), exist_ok=True)
+open(os.path.join(installed, "DocKube.exe"), "w").write("OLD-EXE")
+open(os.path.join(installed, "_internal", "OLDSTALE.dll"), "w").write("stale")
+
+staged_update = tempfile.mkdtemp(prefix="dockeybe_staged_")
+shutil.copytree(BUNDLE, os.path.join(staged_update, "DocKube"))
+swap_batch = app_update._installer_script(
+    os.path.join(staged_update, "DocKube"), installed,
+    os.path.join(installed, "upd.log"), True)
+swap_batch = swap_batch.replace('start "" "%LAUNCH%"', "rem launch stubbed")
+swap_script = os.path.join(tmp, "installed_swap.bat")
+with open(swap_script, "w", encoding="utf-8", newline="") as handle:
+    handle.write(swap_batch)
+swapped = subprocess.run(["cmd", "/c", swap_script], capture_output=True,
+                         text=True, timeout=300)
+check(swapped.returncode == 0,
+      f"the install swap failed: {swapped.stderr[:200]}")
+check(os.path.isfile(os.path.join(installed, "_internal", "python314.dll")),
+      "the interpreter was not installed by the update")
+check(not os.path.exists(os.path.join(installed, "_internal", "OLDSTALE.dll")),
+      "the update left a stale library in the installed application")
+print("installed folder updated: interpreter in place, stale files cleared")
+
+shutil.rmtree(installed, ignore_errors=True)
+shutil.rmtree(staged_update, ignore_errors=True)
+
 # -------------------------------------------------------- installer script
 print("\ninstaller script")
 check(app_update.current_exe_path() is None,
@@ -340,6 +376,18 @@ if os.path.isfile(gradle):
               f"versionCode is {code.group(1)}; it must keep rising or the "
               "package installer will reject the update")
         print("release body:", stamped)
+        # The installer quotes the same number, and a mismatch would ship an
+        # installer whose Add/Remove entry lies about the version.
+        iss = os.path.join(HERE, "installer.iss")
+        if os.path.isfile(iss):
+            text = open(iss, encoding="utf-8").read()
+            declared = re.search(r'#define AppVersion "(.*)"', text)
+            check(declared is not None, "installer.iss has no AppVersion")
+            if declared and name:
+                check(declared.group(1) == name.group(1),
+                      f"the installer says {declared.group(1)} but the app "
+                      f"reports {name.group(1)}")
+                print("installer version:", declared.group(1))
 else:
     print("build.gradle.kts not found next to the desktop app; skipped")
 
@@ -348,9 +396,8 @@ else:
 # imports cleanly from source can still be missing from the bundle. The only
 # way to know is to look at the archive the build actually produced.
 toc = os.path.join(HERE, "build", "DocKube", "PYZ-00.toc")
-bundle = os.path.join(HERE, "dist", "DocKube")
-exe = os.path.join(bundle, "DocKube.exe")
-internal = os.path.join(bundle, "_internal")
+exe = os.path.join(BUNDLE, "DocKube.exe")
+internal = os.path.join(BUNDLE, "_internal")
 if os.path.isfile(toc) and os.path.isfile(exe):
     contents = open(toc, encoding="utf-8", errors="replace").read()
     check("'app_update'" in contents,
