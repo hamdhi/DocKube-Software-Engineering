@@ -62,7 +62,14 @@ fun UpdateDialog(onDismiss: () -> Unit) {
 
     val outcome = (phase as? Phase.Result)?.outcome
     val download = phase as? Phase.Downloading
-    val available = (outcome as? UpdateResult.Available)?.release
+    // Both a proven newer build and an undecidable one offer the download.
+    // Only "UpToDate" withholds it, because that is the only case where we
+    // know installing would change nothing.
+    val available = when (val result = outcome) {
+        is UpdateResult.Available -> result.release
+        is UpdateResult.Unknown -> result.release
+        else -> null
+    }
 
     AlertDialog(
         onDismissRequest = { if (download == null) onDismiss() },
@@ -72,8 +79,10 @@ fun UpdateDialog(onDismiss: () -> Unit) {
                 text = when {
                     phase is Phase.Checking -> "Checking for updates"
                     download != null -> "Downloading"
-                    available != null -> "Update available"
-                    outcome is UpdateResult.Failed -> "Update check failed"
+                    (outcome as? UpdateResult.Available) != null -> "Update available"
+                    // "You are up to date" would be a claim we cannot make.
+                    (outcome as? UpdateResult.Unknown) != null -> "Newest build unknown"
+                    (outcome as? UpdateResult.Failed) != null -> "Update check failed"
                     else -> "You are up to date"
                 },
                 color = DocText,
@@ -124,6 +133,7 @@ fun UpdateDialog(onDismiss: () -> Unit) {
                             is Phase.Result -> when (val result = current.outcome) {
                                 is UpdateResult.Available -> describe(result.release)
                                 is UpdateResult.UpToDate -> result.message
+                                is UpdateResult.Unknown -> result.message
                                 is UpdateResult.Failed -> result.message
                             }
                             else -> ""

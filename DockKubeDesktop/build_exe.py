@@ -1,8 +1,21 @@
-"""Build dist\\DocKube.exe with PyInstaller.
+"""Build dist\\DocKube\\ with PyInstaller.
 
 Usage:
-    python build_exe.py            build a fresh executable
+    python build_exe.py            build a fresh application
     python build_exe.py --clean    remove build artefacts first
+
+This builds a **onedir** bundle, not a single .exe. That is deliberate.
+
+A onefile build unpacks roughly 250 DLLs into %TEMP%\\_MEIxxxxxx on every
+launch and deletes them afterwards. Antivirus software watches that folder,
+and on a machine with ESET installed it quarantines DLLs *during* the unpack.
+The app then dies on startup with "Failed to load Python DLL", which looks
+like a broken build but is actually antivirus interfering with the temp
+extraction.
+
+A ononedir bundle keeps the interpreter and every library in one ordinary
+folder next to the app, so there is no unpack step for antivirus to attack
+and the folder can be moved or copied anywhere.
 
 The bundled modules are listed explicitly because they are imported by name
 rather than discovered, so PyInstaller's static analysis cannot see them.
@@ -81,7 +94,8 @@ def main():
     command = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm",
-        "--onefile",
+        # A folder, not a single file. See the module docstring for why.
+        "--onedir",
         "--windowed",
         "--name", NAME,
         "--hidden-import", "customtkinter",
@@ -101,14 +115,27 @@ def main():
         print("\nBUILD FAILED")
         return result.returncode
 
-    built = os.path.join(ROOT, "dist", f"{NAME}.exe")
+    bundle = os.path.join(ROOT, "dist", NAME)
+    built = os.path.join(bundle, f"{NAME}.exe")
     if not os.path.isfile(built):
-        print("\nBUILD FAILED: dist\\DocKube.exe was not produced")
+        print(f"\nBUILD FAILED: {built} was not produced")
+        return 1
+    # A onedir bundle is incomplete without the library folder next to the exe,
+    # and that is the failure the user actually sees at runtime.
+    internal = os.path.join(bundle, "_internal")
+    if not os.path.isdir(internal):
+        print(f"\nBUILD FAILED: {internal} is missing, the bundle cannot run")
         return 1
 
-    size_mb = os.path.getsize(built) / (1024 * 1024)
-    print(f"\nBUILD OK: {built}  ({size_mb:.1f} MB)")
-    print(f"Double-click DocKube.bat, or run dist\\{NAME}.exe directly.")
+    def folder_size(path):
+        return sum(os.path.getsize(os.path.join(base, name))
+                   for base, _, names in os.walk(path) for name in names)
+
+    size_mb = folder_size(bundle) / (1024 * 1024)
+    libraries = sum(len(names) for _, _, names in os.walk(internal))
+    print(f"\nBUILD OK: {bundle}  ({size_mb:.1f} MB, {libraries} bundled libraries)")
+    print("The whole folder must be kept together: it is the application.")
+    print(f"Run it with: {built}")
     return 0
 
 

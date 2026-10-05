@@ -29,8 +29,23 @@ data class ReleaseInfo(
 
 /** Outcome of an update check, already reduced to what the UI has to say. */
 sealed interface UpdateResult {
+    /** A genuinely newer build. The download is offered. */
     data class Available(val release: ReleaseInfo) : UpdateResult
+
+    /** Proven to be the newest build, so the download is blocked. */
     data class UpToDate(val message: String) : UpdateResult
+
+    /**
+     * The feed carries no version and there is no earlier check to compare
+     * against, so nothing can be concluded either way.
+     *
+     * This is deliberately not [UpToDate]. The live release publishes no
+     * version, and treating that as "up to date" left the user with no way to
+     * install anything at all. The release is carried so the download stays
+     * available.
+     */
+    data class Unknown(val release: ReleaseInfo, val message: String) : UpdateResult
+
     data class Failed(val message: String) : UpdateResult
 }
 
@@ -87,11 +102,14 @@ object UpdateRepository {
             }
         }
 
-        // Nothing to compare against, so say so rather than guessing.
-        return UpdateResult.UpToDate(
+        // Nothing to compare against. This is Unknown rather than UpToDate, so
+        // the download stays available: the user may well be behind, and
+        // blocking here is what made the button do nothing.
+        return UpdateResult.Unknown(
+            release,
             "This release carries no version number and there is no earlier " +
                 "check to compare it against, so DocKube cannot tell whether " +
-                "$current is the newest build."
+                "$current is the newest build. You can still download it."
         )
     }
 

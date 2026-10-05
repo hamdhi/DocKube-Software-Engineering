@@ -26,6 +26,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+import zipfile
 
 # Single source of truth for the desktop version. The publish workflow greps
 # this line out of the file to stamp the release body, so keep the format.
@@ -45,8 +46,9 @@ _DIGEST_RE = re.compile(r"^sha256:([0-9a-f]{64})$", re.IGNORECASE)
 _VERSION_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 # The published asset has been called both dockube.exe and DocKube.exe over
-# time, so the download name is a preference rather than a formality.
-_PREFERRED_ASSETS = ("dockeybe.exe", "dockube.exe")
+# time, and the application is now a folder rather than a single file, so the
+# download name is a preference rather than a formality.
+_PREFERRED_ASSETS = ("dockeybe.exe", "dockube.exe", "dockeybe.zip", "dockube.zip")
 
 _CHUNK = 64 * 1024
 
@@ -98,10 +100,13 @@ class ReleaseInfo:
         self.body = data.get("body", "") or ""
         self.published_at = data.get("published_at", "")
         self.html_url = data.get("html_url") or RELEASES_PAGE
-        asset = select_exe_asset(data.get("assets")) or {}
+        asset = select_asset(data.get("assets")) or {}
         self.asset_name = asset.get("name", "")
         self.asset_size = asset.get("size", 0) or 0
         self.download_url = asset.get("browser_download_url", "")
+        # True when the asset is a zip of the whole folder, which is what the
+        # current build publishes and the only thing that can update it.
+        self.is_bundle = self.asset_name.lower().endswith(".zip")
         # GitHub added digests in 2025; an older release simply has none.
         digest = asset.get("digest", "") or ""
         match = _DIGEST_RE.match(str(digest))
@@ -148,60 +153,101 @@ def fetch_latest(timeout=15):
 def assess(release, current_version=APP_VERSION, known_digest=None):
     """Decide whether `release` is newer than what is running.
 
-    Two signals, because the feed is a pinned tag with no version in it:
+    Returns ``(status, message)`` where status is one of:
+
+    * ``"update"``  - a genuinely newer build; the download may be offered.
+    * ``"current"`` - proven to be the newest build; the download must be
+      blocked, because downloading it would change nothing.
+    * ``"unknown"`` - the feed carries no version and there is no earlier
+      check to compare against. The download stays available, since the user
+      may legitimately want the newest build regardless.
+
+    Two signals are used, because the feed is a pinned tag with no version:
 
     * A parsed version, compared numerically. Exact when the workflow has
       stamped one.
-    * The asset sha256 against the digest recorded by the last check. This
-      covers releases published before stamping began. On a first run there
-      is nothing to compare, so it reports "up to date" rather than claiming
-      an update it cannot substantiate.
+    * The asset sha256 against the digest recorded by the last check, which
+      covers releases published before stamping began.
     """
     remote = release.version
     local = parse_version(current_version)
 
     if remote is not None and local is not None:
         if compare_versions(remote, local) > 0:
-            return True, f"Version {current_version} is installed; {release.version_label()} is published."
-        return False, f"DocKube {release.version_label()} is already installed."
+            return "update", (f"Version {current_version} is installed; "
+                              f"{release.version_label()} is published.")
+        return "current", f"DocKube {release.version_label()} is already installed."
 
     if known_digest and release.sha256 and release.sha256 != known_digest:
-        return True, "A newer build has been published since the last check."
+        return "update", "A newer build has been published since the last check."
 
     if known_digest and release.sha256:
-        return False, "The published build matches the last one checked."
+        return "current", "The published build matches the last one checked."
 
     # No version on the release and no previous check to compare against, so
-    # there is genuinely nothing to go on. Say that rather than implying the
+    # there is genuinely nothing to go on. Say that rather than claiming the
     # app is current, which we cannot actually claim.
-    return False, ("This release carries no version number and there is no "
-                   "earlier check to compare it against, so DocKube cannot "
-                   f"tell whether {current_version} is the newest build.")
+    return "unknown", ("This release carries no version number and there is no "
+                       "earlier check to compare it against, so DocKube cannot "
+                       f"tell whether {current_version} is the newest build.")
 
 
-def select_exe_asset(assets):
-    """Return the application .exe from a release's asset list, or None."""
-    executables = [asset for asset in (assets or [])
-                   if str(asset.get("name", "")).lower().endswith(".exe")]
-    if not executables:
+def select_asset(assets):
+    """Return the asset that carries the application, or None.
+
+    The application ships as a folder now, so the publish workflow uploads a
+    zip of the whole bundle. A bare .exe is still accepted, because that is
+    what older releases contain and what the update path has to keep working.
+    A bare .exe cannot update a folder build safely, and install_update says so
+    rather than corrupting the installation.
+    """
+    items = list(assets or [])
+    if not items:
         return None
-    for preferred in _PREFERRED_ASSETS:
-        for asset in executables:
-            if str(asset.get("name", "")).lower() == preferred:
-                return asset
-    return executables[0]
+
+    def named(candidate):
+        return next((a for a in items
+                     if str(a.get("name", "")).lower() == candidate), None)
+
+    # A zip of the folder is the correct artifact and always wins.
+    for archive in ("dockeybe.zip", "dockube.zip"):
+        found = named(archive)
+        if found:
+            return found
+    for archive in items:
+        if str(archive.get("name", "")).lower().endswith(".zip"):
+            return archive
+
+    executables = [a for a in items
+                   if str(a.get("name", "")).lower().endswith(".exe")]
+    for preferred in ("dockeybe.exe", "dockube.exe"):
+        found = named(preferred)
+        if found:
+            return found
+    return executables[0] if executables else None
 
 
 def current_exe_path():
-    """The .exe to replace, or None when running from source.
+    """The installed .exe, or None when running from source.
 
     Frozen, that is the running executable itself. From source there is no
-    single install target, so the caller is told so rather than being handed
-    a path it cannot write to.
+    install target, so the caller is told so rather than being handed a path it
+    cannot write to.
     """
     if getattr(sys, "frozen", False):
         return sys.executable
     return None
+
+
+def install_folder():
+    """The folder to replace, which is the whole application.
+
+    A bundle install cannot be updated by replacing one file, because the
+    interpreter and every library live in _internal beside the executable.
+    This returns that folder, or None when running from source.
+    """
+    exe = current_exe_path()
+    return os.path.dirname(os.path.abspath(exe)) if exe else None
 
 
 def download(release, dest_path, on_progress=None, chunk=_CHUNK):
@@ -245,18 +291,98 @@ def download(release, dest_path, on_progress=None, chunk=_CHUNK):
         raise
 
 
+def unpack_bundle(archive_path):
+    """Unpack a zip of the application folder and return the folder path.
+
+    The archive is read first and unpacked into a sibling directory, because
+    the archive itself lives at `archive_path` and must survive until it has
+    been read.
+
+    Zipping a folder usually leaves one wrapping folder inside the archive, so a
+    lone directory at the root is stripped to reveal the real contents. The
+    result is the folder that gets mirrored over the installation.
+    """
+    target = archive_path.rstrip("\\/") + "_unpacked"
+    if os.path.isdir(target):
+        shutil.rmtree(target, ignore_errors=True)
+    os.makedirs(target, exist_ok=True)
+
+    with zipfile.ZipFile(archive_path) as archive:
+        # Refuse any member that would be written outside the target directory.
+        for member in archive.namelist():
+            resolved = os.path.abspath(os.path.join(target, member))
+            if resolved != os.path.abspath(target) and not resolved.startswith(
+                    os.path.abspath(target) + os.sep):
+                raise UpdateError(f"the archive contains an unsafe path: {member}")
+        archive.extractall(target)
+
+    entries = os.listdir(target)
+    # One entry and it is a folder means the zip wrapped everything; step in.
+    if len(entries) == 1:
+        only = os.path.join(target, entries[0])
+        if os.path.isdir(only):
+            inner = target + "_inner"
+            os.rename(only, inner)
+            shutil.rmtree(target, ignore_errors=True)
+            os.rename(inner, target)
+
+    # Zipping a folder by path can leave the archive inside the tree.
+    for base, _, names in os.walk(target):
+        for name in names:
+            if name.lower().endswith(".zip"):
+                os.remove(os.path.join(base, name))
+    return target
+
+
 # The helper must outlive the app it is updating, so it is fully detached
 # rather than a child process that dies with its parent's console.
 _DETACHED = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
     subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 
 
-def _installer_script(staged, target, log_path):
+def _installer_script(staged, target, log_path, is_bundle=False):
     """The batch file that does the swap once the app has exited.
 
     Windows will not let the running exe be overwritten, so the copy is
     retried for a minute rather than attempted once and silently abandoned.
+
+    For a bundle the whole folder is mirrored instead of a single file being
+    copied, because a bundle build keeps roughly a thousand library files
+    beside the exe and replacing only the exe would leave the old ones behind.
+    robocopy /MIR also removes files the previous version had and this one does
+    not, which is what stops stale DLLs accumulating over many updates.
     """
+    if is_bundle:
+        swap = [
+            'robocopy "%SOURCE%" "%TARGET%" /MIR /NFL /NDL /NJH /NJS /NP >NUL 2>&1',
+            "if errorlevel 8 goto :failed",
+        ]
+    else:
+        swap = [
+            'copy /Y "%STAGED%" "%TARGET%" >NUL 2>&1',
+            'if not errorlevel 1 goto :swapped',
+        ]
+    retry_block = [
+        "rem Wait for the old process to release its lock on the target.",
+        "for /L %%i in (1,1,60) do (",
+    ] + [f"    {line}" for line in swap] + [
+        "    ping -n 2 127.0.0.1 >NUL",
+        ")",
+        "goto :failed",
+        "",
+        ":swapped",
+        'rmdir /S /Q "%STAGED%" >NUL 2>&1',
+        'del "%LOG%" >NUL 2>&1',
+        'start "" "%LAUNCH%"',
+        "",
+        ":failed",
+        "rem The old files are still intact, so the app was not damaged.",
+        'echo DocKube could not replace the running app. > "%LOG%"',
+        "",
+        ":cleanup",
+        "endlocal",
+        "",
+    ]
     return "\r\n".join([
         "@echo off",
         "rem Written by DocKube: waits for the running app to exit, replaces",
@@ -264,34 +390,22 @@ def _installer_script(staged, target, log_path):
         "setlocal",
         f'set "STAGED={staged}"',
         f'set "TARGET={target}"',
+        f'set "LAUNCH={target}"',
+        f'set "SOURCE={staged}"',
         f'set "LOG={log_path}"',
         "",
-        "rem Wait for the old process to release its lock on the target.",
-        "for /L %%i in (1,1,60) do (",
-        "    copy /Y \"%STAGED%\" \"%TARGET%\" >NUL 2>&1 && goto :swapped",
-        "    ping -n 2 127.0.0.1 >NUL",
-        ")",
-        "",
-        "rem Still locked after a minute. Keep the download so it is not lost.",
-        "echo DocKube could not replace the running app. > \"%LOG%\"",
-        "goto :cleanup",
-        "",
-        ":swapped",
-        "del \"%STAGED%\" >NUL 2>&1",
-        "del \"%LOG%\" >NUL 2>&1",
-        "start \"\" \"%TARGET%\"",
-        "",
-        ":cleanup",
-        "endlocal",
-        "",
-    ])
+    ] + retry_block)
 
 
-def install_downloaded(staged, target, log_path=None):
+def install_downloaded(staged, target, log_path=None, is_bundle=False):
     """Launch a detached helper that swaps `staged` into `target` and restarts.
 
+    With `is_bundle`, `staged` is an extracted folder and `target` is the
+    installation folder that gets mirrored over; otherwise `staged` is a single
+    executable and `target` is the file to overwrite.
+
     Returns the script path. The caller must close the app afterwards: the
-    helper waits for the old process to exit before it can copy anything.
+    helper waits for the old process to exit before it can replace anything.
     """
     staged = os.path.abspath(staged)
     target = os.path.abspath(target)
@@ -300,7 +414,7 @@ def install_downloaded(staged, target, log_path=None):
     script_dir = tempfile.mkdtemp(prefix="dockeybe_install_")
     script_path = os.path.join(script_dir, "apply_update.bat")
     with open(script_path, "w", encoding="utf-8") as handle:
-        handle.write(_installer_script(staged, target, log_path))
+        handle.write(_installer_script(staged, target, log_path, is_bundle))
     subprocess.Popen(
         ["cmd", "/c", script_path],
         creationflags=_DETACHED,

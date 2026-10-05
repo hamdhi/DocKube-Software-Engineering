@@ -10,6 +10,7 @@ import csv
 import io
 import json
 import queue
+import tempfile
 
 import app_update
 import devops_tools
@@ -615,9 +616,9 @@ class App(ctk.CTk):
         def task():
             try:
                 release = app_update.fetch_latest()
-                newer, message = app_update.assess(
+                status, message = app_update.assess(
                     release, app_update.APP_VERSION, known_digest)
-                self.after(0, self._update_checked, release, newer, message)
+                self.after(0, self._update_checked, release, status, message)
             except Exception as exc:
                 self.after(0, self._update_failed, exc)
 
@@ -628,15 +629,15 @@ class App(ctk.CTk):
         self.set_status("Update check failed")
         messagebox.showerror("Update check failed", str(exc), parent=self)
 
-    def _update_checked(self, release, newer, message):
+    def _update_checked(self, release, status, message):
         self.update_btn.configure(state="normal", text="Update App")
         self.set_status(message)
         self.version_label.configure(
-            text=(f"DocKube {app_update.APP_VERSION} - update available" if newer
-                  else f"DocKube {app_update.APP_VERSION}"))
-        self._show_update_dialog(release, newer, message)
+            text=(f"DocKube {app_update.APP_VERSION} - update available"
+                  if status == "update" else f"DocKube {app_update.APP_VERSION}"))
+        self._show_update_dialog(release, status, message)
 
-    def _show_update_dialog(self, release, newer, message):
+    def _show_update_dialog(self, release, status, message):
         """Explain what was found, and offer to install it if there is one."""
         dialog = ctk.CTkToplevel(self)
         dialog.title("DocKube Update")
@@ -644,7 +645,8 @@ class App(ctk.CTk):
         dialog.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             dialog,
-            text="A newer DocKube is available" if newer else "You are up to date",
+            text=("A newer DocKube is available" if status == "update"
+                  else "You are up to date"),
             font=ctk.CTkFont(size=16, weight="bold"),
         ).grid(row=0, column=0, padx=20, pady=(18, 6), sticky="w")
         ctk.CTkLabel(dialog, text=message, justify="left", wraplength=380,
@@ -673,12 +675,18 @@ class App(ctk.CTk):
             buttons, text="Open release page", width=150,
             command=lambda: webbrowser.open(release.html_url)).pack(
                 side="left", padx=(0, 8))
-        # Reinstalling is offered even when nothing looks newer: the version
-        # cannot always be read from the feed, and a manual reinstall is a
-        # reasonable thing to want.
+        # Downloading a build we have already proved is the current one would change
+        # nothing, so the button is disabled instead of quietly wasting a
+        # download. "unknown" keeps it enabled, because there the user may
+        # still want the newest build and we cannot tell them it is unnecessary.
+        can_install = status != "current"
         ctk.CTkButton(
-            buttons, text="Download and install", width=150,
-            fg_color="#238636", hover_color="#2ea043",
+            buttons,
+            text="Download and install" if can_install else "Already up to date",
+            width=150,
+            state="normal" if can_install else "disabled",
+            fg_color="#238636" if can_install else ("gray40", "gray35"),
+            hover_color="#2ea043",
             command=lambda: self.install_update(release)).pack(side="left")
         dialog.after(50, lambda: dialog.focus_force())
 
@@ -690,24 +698,43 @@ class App(ctk.CTk):
                 "Running from source",
                 "DocKube is running from source, so there is no installed "
                 "executable to replace.\n\nBuild it with python build_exe.py "
-                "and run dist\\DocKube.exe to update that copy.",
+                "and run dist\\DocKube\\DocKube.exe to update that copy.",
+                parent=self)
+            return
+        # This install is a folder, so the published build has to be one too.
+        # Overwriting the exe alone would leave the previous version's
+        # libraries behind and the next launch would fail.
+        if app_update.install_folder() and not release.is_bundle:
+            messagebox.showerror(
+                "This update cannot be installed",
+                "DocKube is installed as a folder, but the newest published "
+                "build is a single executable.\n\nReplacing one file would leave "
+                "the old libraries in place and break the next launch.\n\nUse "
+                "'Open release page' and copy the whole folder instead.",
                 parent=self)
             return
         # Checked before the download rather than after: there is no point
-        # pulling 15 MB only to find the folder cannot be written to.
+        # pulling 30 MB only to find the folder cannot be written to.
         if not os.access(os.path.dirname(target), os.W_OK):
             messagebox.showerror(
                 "Cannot install here",
-                f"{target}\nis not writable.\n\nMove DocKube somewhere you own, "
-                "such as your Downloads folder, and try again.",
+                f"{target}\nis not writable.\n\nMove the DocKube folder "
+                "somewhere you own, such as your Downloads folder, and try again.",
                 parent=self)
             return
 
         self.update_btn.configure(state="disabled", text="Downloading...")
         self.set_status(f"Downloading {release.asset_name}...")
         progress = self._download_dialog(release)
-        staged = os.path.join(
-            os.path.dirname(target), f"{release.asset_name}.new")
+        # A bundle is staged outside the install folder, because the folder is
+        # what the update replaces and writing the download into it would make
+        # the mirror copy a file onto itself.
+        if release.is_bundle:
+            staged = os.path.join(
+                tempfile.gettempdir(), f"dockeybe_update_{os.getpid()}")
+        else:
+            staged = os.path.join(
+                os.path.dirname(target), f"{release.asset_name}.new")
 
         def task():
             try:
@@ -715,13 +742,19 @@ class App(ctk.CTk):
                     release, staged,
                     on_progress=lambda done, total: self.after(
                         0, progress["set"], done, total))
+                if release.is_bundle:
+                    # The asset is a zip of the whole application folder, so
+                    # unpack it before the swap. DocKube.exe usually sits one
+                    # level down inside it, which is unwrapped here.
+                    self.after(0, progress["set"], release.asset_size, release.asset_size)
+                    app_update.unpack_bundle(staged)
             except Exception as exc:
                 self.after(0, self._download_failed, progress, exc)
                 return
             # Recorded only once the bytes are verified, so a later check
             # compares against a build that is genuinely on disk.
             self._save_pref("desktop_build_digest", release.sha256)
-            self.after(0, self._download_done, progress, staged, target)
+            self.after(0, self._download_done, progress, staged, target, release.is_bundle)
 
         threading.Thread(target=task, daemon=True).start()
 
@@ -731,7 +764,7 @@ class App(ctk.CTk):
         self.set_status("Download failed")
         messagebox.showerror("Download failed", str(exc), parent=self)
 
-    def _download_done(self, progress, staged, target):
+    def _download_done(self, progress, staged, target, is_bundle=False):
         """Hand off to the detached installer, then close so it can proceed."""
         progress["close"]()
         if not messagebox.askyesno(
@@ -742,7 +775,13 @@ class App(ctk.CTk):
             self.set_status("Update downloaded but not installed")
             return
         try:
-            app_update.install_downloaded(staged, target)
+            if is_bundle:
+                # Replace the whole installation folder, so the launch target
+                # is the folder rather than the executable inside it.
+                folder = app_update.install_folder()
+                app_update.install_downloaded(staged, folder, is_bundle=True)
+            else:
+                app_update.install_downloaded(staged, target)
         except Exception as exc:
             messagebox.showerror(
                 "Could not start the installer",
@@ -751,7 +790,7 @@ class App(ctk.CTk):
             return
         self.set_status("Installing the update and restarting")
         # The helper cannot overwrite a running executable, so the app has to
-        # be gone before it copies anything.
+        # be gone before it replaces anything.
         self.after(150, self._shutdown)
 
     def _download_dialog(self, release):

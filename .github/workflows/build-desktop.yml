@@ -32,15 +32,24 @@ jobs:
           echo "Publishing DocKube-Desktop v$VERSION"
           echo "DocKube-Desktop v$VERSION" > release_body.txt
 
+      - name: Package the application
+        run: |
+          cd DockKubeDesktop/dist
+          # One zip, not a thousand separate assets. The application is a
+          # folder, so publishing it as a folder would attach every library
+          # to the release individually and the updater would have no single
+          # artifact to download.
+          zip -qr dockeybe.zip DocKube -x '*.DS_Store'
+          ls -lh dockeybe.zip
+
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           tag_name: desktop-latest
           name: Latest Desktop Build
           body_path: release_body.txt
-          # Pinned to the executable build_exe.py produces, so the tag always
-          # points at that one file instead of whatever .exe happens to be
-          # committed. It has to be committed for this workflow to find it.
-          files: DockKubeDesktop/dist/DocKube.exe
+          # The zipped bundle. It has to be committed for this workflow to find
+          # it, the same as the exe was before the build became a folder.
+          files: DockKubeDesktop/dist/dockeybe.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

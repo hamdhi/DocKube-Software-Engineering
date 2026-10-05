@@ -19,6 +19,8 @@ Usage:
 import hashlib
 import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -92,34 +94,56 @@ check(app_update.compare_versions(None, (1, 0, 0)) == 0, "an unknown version mus
 print("\nasset selection")
 assets = [{"name": "notes.txt"}, {"name": "setup.exe.blockmap"},
           {"name": "Other.exe"}, {"name": "DocKube.exe"}, {"name": "dockube.exe"}]
-check(app_update.select_exe_asset(assets)["name"] == "DocKube.exe",
+check(app_update.select_asset(assets)["name"] == "DocKube.exe",
       "DocKube.exe must win over the other executables")
-check(app_update.select_exe_asset([{"name": "other.exe"}])["name"] == "other.exe",
+check(app_update.select_asset([{"name": "other.exe"}])["name"] == "other.exe",
       "an unlisted executable should still be usable")
-check(app_update.select_exe_asset([{"name": "readme.md"}]) is None,
-      "picked an executable out of a release with none")
-check(app_update.select_exe_asset([]) is None, "an empty asset list should give None")
-check(app_update.select_exe_asset(None) is None, "a missing asset list should give None")
+check(app_update.select_asset([{"name": "readme.md"}]) is None,
+      "picked an artifact out of a release with none")
+check(app_update.select_asset([]) is None, "an empty asset list should give None")
+check(app_update.select_asset(None) is None, "a missing asset list should give None")
+
+# A folder build publishes a zip, and that zip is the only artifact that can
+# update a folder install, so it has to win over any loose .exe.
+print("\nasset selection: the bundle zip wins")
+mixed = [{"name": "dockube.exe", "size": 1}, {"name": "dockube.zip", "size": 30}]
+check(app_update.select_asset(mixed)["name"] == "dockube.zip",
+      "the bundle zip must be preferred over a loose exe")
+check(app_update.ReleaseInfo(payload(assets=[
+    {"name": "dockube.zip", "size": 30, "digest": "sha256:" + "c" * 64,
+     "browser_download_url": "u"}])).is_bundle,
+    "a .zip asset must be marked as a bundle")
+check(not app_update.ReleaseInfo(payload()).is_bundle,
+      "an .exe asset must not be marked as a bundle")
 
 # ------------------------------------------------------------------ assess
 print("\nupdate decision")
 stamped = app_update.ReleaseInfo(payload(body="DocKube-Desktop v2.0.0 (build 9)"))
-newer, message = app_update.assess(stamped, "1.1.0")
-check(newer, f"2.0.0 should be newer than 1.1.0 ({message})")
-newer, message = app_update.assess(stamped, "2.0.0")
-check(not newer, f"2.0.0 should not beat 2.0.0 ({message})")
-newer, message = app_update.assess(stamped, "9.9.9")
-check(not newer, f"1.1.0 should not beat 9.9.9 ({message})")
+state, message = app_update.assess(stamped, "1.1.0")
+check(state == "update", f"2.0.0 should be newer than 1.1.0 ({state})")
+state, message = app_update.assess(stamped, "2.0.0")
+check(state == "current", f"2.0.0 against 2.0.0 should be current ({state})")
+state, message = app_update.assess(stamped, "9.9.9")
+check(state == "current", f"1.1.0 against 9.9.9 should be current ({state})")
+
+# The UI blocks the download on exactly "current", so a build that is already
+# installed must never come back as "update".
+same, _ = app_update.assess(stamped, "2.0.0")
+check(same != "update", "the installed version must never be offered as an update")
 
 # An unstamped release is the real case in the wild right now.
 unstamped = app_update.ReleaseInfo(payload())
 check(unstamped.version is None, "the live release should have no parseable version")
-newer, message = app_update.assess(unstamped, "1.1.0", known_digest="b" * 64)
-check(newer, "a changed digest with no version should still report an update")
-newer, message = app_update.assess(unstamped, "1.1.0", known_digest=unstamped.sha256)
-check(not newer, "an unchanged digest must not report an update")
-newer, message = app_update.assess(unstamped, "1.1.0")
-check(not newer, "with nothing to compare, an update must not be invented")
+state, message = app_update.assess(unstamped, "1.1.0", known_digest="b" * 64)
+check(state == "update", "a changed digest with no version should report an update")
+state, message = app_update.assess(unstamped, "1.1.0", known_digest=unstamped.sha256)
+check(state == "current", "an unchanged digest must report current, blocking the download")
+state, message = app_update.assess(unstamped, "1.1.0")
+check(state == "unknown", "with nothing to compare the state must be unknown")
+check(state != "current", "an undecidable check must not claim to be up to date")
+check(state != "update", "an undecidable check must not invent an update")
+check("cannot tell" in message, f"an undecidable check should say so ({message})")
+
 # ---------------------------------------------------------------- download
 print("\ndownload verification")
 tmp = tempfile.mkdtemp(prefix="dockeybe_test_")
@@ -198,18 +222,100 @@ try:
 finally:
     app_update.urllib.request.urlopen = real
 
+# A real folder swap, using the real generated script, proves the mirror works
+# and that stale libraries are removed. Running the script rather than just
+# inspecting it is the only way to catch a broken batch file.
+old_install = tempfile.mkdtemp(prefix="dockeybe_old_")
+os.makedirs(os.path.join(old_install, "_internal"), exist_ok=True)
+open(os.path.join(old_install, "DocKube.exe"), "w").write("OLD-EXE")
+open(os.path.join(old_install, "_internal", "old.dll"), "w").write("OLD")
+
+staged_build = tempfile.mkdtemp(prefix="dockeybe_new_")
+os.makedirs(os.path.join(staged_build, "_internal"), exist_ok=True)
+open(os.path.join(staged_build, "DocKube.exe"), "w").write("NEW-EXE")
+open(os.path.join(staged_build, "_internal", "new.dll"), "w").write("NEW")
+
+batch = app_update._installer_script(
+    staged_build, old_install, os.path.join(old_install, "upd.log"), True)
+# The relaunch is stubbed out so the test does not start a second copy of the
+# app. Everything else, including the robocopy mirror, runs for real.
+batch = batch.replace('start "" "%LAUNCH%"', "rem launch stubbed")
+script_path = os.path.join(tmp, "swap_test.bat")
+with open(script_path, "w", encoding="utf-8", newline="") as handle:
+    handle.write(batch)
+result = subprocess.run(["cmd", "/c", script_path], capture_output=True,
+                        text=True, timeout=180)
+check(result.returncode == 0,
+      f"the folder swap script failed: {result.stderr[:200]}")
+check(open(os.path.join(old_install, "DocKube.exe")).read() == "NEW-EXE",
+      "the exe was not replaced")
+check(os.path.isfile(os.path.join(old_install, "_internal", "new.dll")),
+      "the new libraries were not installed")
+check(not os.path.exists(os.path.join(old_install, "_internal", "old.dll")),
+      "the mirror left a stale library behind")
+print("folder swap: exe replaced, new libraries in, stale ones removed")
+
+shutil.rmtree(old_install, ignore_errors=True)
+shutil.rmtree(staged_build, ignore_errors=True)
+
 # -------------------------------------------------------- installer script
 print("\ninstaller script")
 check(app_update.current_exe_path() is None,
       "running from source, so there should be no executable to replace")
+check(app_update.install_folder() is None,
+      "running from source, so there should be no install folder to replace")
 
-script = app_update._installer_script(r"C:\tmp\new.exe", r"C:\app\DocKube.exe", r"C:\app\log.txt")
-check("@echo off" in script, "the installer script is not a batch file")
-check(r'"STAGED=C:\tmp\new.exe"' in script, "the staged path is missing")
-check(r'"TARGET=C:\app\DocKube.exe"' in script, "the target path is missing")
-check("copy /Y" in script, "the script never copies anything")
-check("start" in script, "the script does not restart the app")
-check("for /L" in script, "the script does not retry the locked copy")
+single = app_update._installer_script(r"C:\tmp\new.exe", r"C:\app\DocKube.exe", r"C:\app\log.txt")
+check("@echo off" in single, "the installer script is not a batch file")
+check(r'"STAGED=C:\tmp\new.exe"' in single, "the staged path is missing")
+check(r'"TARGET=C:\app\DocKube.exe"' in single, "the target path is missing")
+check("copy /Y" in single, "the single-file script never copies anything")
+check("start" in single, "the script does not restart the app")
+check("for /L" in single, "the script does not retry the locked copy")
+
+# The folder build has a thousand libraries beside the exe, so replacing one
+# file would leave the old ones behind. The bundle path must mirror the folder.
+bundle = app_update._installer_script(r"C:\tmp\staged", r"C:\app\DocKube", r"C:\app\log.txt", True)
+check("robocopy" in bundle, "the bundle script does not mirror the folder")
+check("/MIR" in bundle, "the bundle script must mirror, so stale files are removed")
+check("copy /Y" not in bundle, "the bundle script must not copy a single file")
+check(r'"TARGET=C:\app\DocKube"' in bundle, "the target folder is missing")
+
+# -------------------------------------------------------------- unpack
+print("\nbundle unpack")
+check(hasattr(app_update, "unpack_bundle"), "unpack_bundle is missing")
+import zipfile
+
+zdir = tempfile.mkdtemp(prefix="dockeybe_zip_")
+flat = os.path.join(zdir, "flat.zip")
+with zipfile.ZipFile(flat, "w") as z:
+    z.writestr("DocKube.exe", "binary")
+    z.writestr("_internal/python314.dll", "lib")
+out = app_update.unpack_bundle(flat)
+check(os.path.isfile(os.path.join(out, "DocKube.exe")), "flat zip: exe missing")
+check(os.path.isdir(os.path.join(out, "_internal")), "flat zip: _internal missing")
+
+# Zipping a folder by path wraps everything in one folder, which must be
+# stripped or the mirror would nest the application inside itself.
+wrapped = os.path.join(zdir, "wrapped.zip")
+with zipfile.ZipFile(wrapped, "w") as z:
+    z.writestr("DocKube/DocKube.exe", "binary")
+    z.writestr("DocKube/_internal/python314.dll", "lib")
+out = app_update.unpack_bundle(wrapped)
+check(os.path.isfile(os.path.join(out, "DocKube.exe")),
+      f"wrapped zip was not unwrapped, got {sorted(os.listdir(out))}")
+check(os.path.isdir(os.path.join(out, "_internal")),
+      "wrapped zip: _internal missing after unwrapping")
+
+# A path that escapes the target directory must be refused outright.
+evil = os.path.join(zdir, "evil.zip")
+with zipfile.ZipFile(evil, "w") as z:
+    z.writestr("../../escaped.txt", "bad")
+try:
+    app_update.unpack_bundle(evil)
+    failures.append("a zip-slip archive was extracted instead of refused")
+except app_update.UpdateError:
+    check(True, "")
 
 # --------------------------------------------------- the workflow's stamp
 # build-mobile.yml lifts versionName and versionCode out of this file to stamp
@@ -223,27 +329,42 @@ if os.path.isfile(gradle):
     check(name is not None, "no versionName line for the workflow to read")
     check(code is not None, "no versionCode line for the workflow to read")
     if name and code:
-        # This is the exact body build-mobile.yml publishes.
+        # The exact body build-mobile.yml publishes.
         stamped = f"DocKube-Android v{name.group(1)} (versionCode {code.group(1)})"
         check(app_update.parse_version(stamped) is not None,
               f"the app cannot read a version back out of {stamped!r}")
+        # Android refuses to install an APK whose versionCode is not higher than
+        # the installed one. If this ever stops rising, the in-app update
+        # downloads an APK the installer then rejects.
+        check(int(code.group(1)) > 2,
+              f"versionCode is {code.group(1)}; it must keep rising or the "
+              "package installer will reject the update")
         print("release body:", stamped)
 else:
     print("build.gradle.kts not found next to the desktop app; skipped")
 
 # ------------------------------------------------ the frozen build has it
 # PyInstaller bundles only what --hidden-import names, so a module that
-# imports cleanly from source can still be missing from the .exe. The only
+# imports cleanly from source can still be missing from the bundle. The only
 # way to know is to look at the archive the build actually produced.
 toc = os.path.join(HERE, "build", "DocKube", "PYZ-00.toc")
-exe = os.path.join(HERE, "dist", "DocKube.exe")
+bundle = os.path.join(HERE, "dist", "DocKube")
+exe = os.path.join(bundle, "DocKube.exe")
+internal = os.path.join(bundle, "_internal")
 if os.path.isfile(toc) and os.path.isfile(exe):
     contents = open(toc, encoding="utf-8", errors="replace").read()
     check("'app_update'" in contents,
           "app_update is not in the frozen build; the Update button would "
-          "raise ImportError in the .exe")
+          "raise ImportError in the exe")
+    # The onedir bundle is only complete with its library folder. Missing it is
+    # exactly what produces "Failed to load Python DLL" on another machine.
+    check(os.path.isdir(internal),
+          "the build has no _internal folder, so the bundle cannot run")
     check(os.path.getsize(exe) > 0, "the built exe is empty")
-    print(f"frozen exe: {os.path.getsize(exe) / (1024 * 1024):.1f} MB, app_update bundled")
+    total = sum(os.path.getsize(os.path.join(base, name))
+                for base, _, names in os.walk(bundle) for name in names)
+    print(f"frozen bundle: {total / (1024 * 1024):.1f} MB in dist\\DocKube, "
+          "app_update bundled")
 else:
     print("no frozen build present; skipped the packaging check")
 
