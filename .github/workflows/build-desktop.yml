@@ -1,4 +1,4 @@
-name: Build Electron Desktop App
+name: Build Python Desktop App
 
 on:
   push:
@@ -12,29 +12,32 @@ jobs:
   build:
     runs-on: windows-latest 
     
+    # Grant permissions to upload to GitHub Releases
+    permissions:
+      contents: write 
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
           
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
           
-      - name: Install and Build Desktop
+      - name: Build Windows Executable
         working-directory: ./DockKubeDesktop
         run: |
-          # --- PYTHON BUILD STEPS ---
           pip install pyinstaller
+          # Build the app using your existing spec file instead of a generic command
+          pyinstaller DockKube.spec
           
-          # Replace 'main.py' with the actual name of your Python file!
-          pyinstaller --onefile main.py
-          
-          # --- ELECTRON BUILD STEPS ---
-          npm install
-          npm run build
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: desktop-latest
+          name: Latest Desktop Build
+          # PyInstaller puts the finished .exe inside the 'dist' folder
+          files: DockKubeDesktop/dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
