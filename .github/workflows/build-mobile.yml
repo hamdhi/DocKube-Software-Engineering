@@ -5,12 +5,19 @@ on:
     branches:
       - main
     paths:
-      - 'DockKubeAndroid/**'
+      # Corrected spelling here!
+      - 'DocKubeAndroid/**'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # Corrected spelling here! This locks the server inside the actual folder.
+    defaults:
+      run:
+        working-directory: ./DocKubeAndroid
+        
     permissions:
       contents: write
 
@@ -18,29 +25,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
         
-      # This forces GitHub to print every folder it successfully downloaded
-      - name: DEBUG - List all files downloaded from GitHub
-        run: ls -la
-        
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
           
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        
       - name: Build Debug APK
-        # We apply the folder path only to this step now
-        working-directory: ./DockKubeAndroid
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
-          
+        run: ./gradlew assembleDebug
+        
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           tag_name: android-latest
           name: Latest Android Build
-          # We must include the folder name here since we removed the global lock
-          files: DockKubeAndroid/app/build/outputs/apk/debug/*.apk
+          files: app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
