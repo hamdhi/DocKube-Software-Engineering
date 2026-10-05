@@ -5,14 +5,21 @@ on:
     branches:
       - main
     paths:
-      - 'DockKubeAndroid/**'
+      - 'DocKubeAndroid/**'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./DocKubeAndroid
+        
+    permissions:
+      contents: write
+
     steps:
-      # THIS STEP IS CRITICAL: It downloads your repository code to the server
       - name: Checkout Code
         uses: actions/checkout@v3
         
@@ -22,9 +29,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           
-      - name: Build APK
-        # Ensure this EXACTLY matches the folder name in your repo (case-sensitive)
-        working-directory: ./DockKubeAndroid
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.13' 
+          
+      - name: Build Debug APK
+        run: gradle assembleDebug
+        
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: android-latest
+          name: Latest Android Build
+          # We must manually specify the folder path here for the plugin
+          files: DocKubeAndroid/app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
