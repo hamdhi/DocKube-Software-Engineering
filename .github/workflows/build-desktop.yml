@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      # Tells GitHub to run ONLY when the .exe inside the dist folder is updated
-      - 'DockKubeDesktop/dist/DocKube.exe'
+      # This triggers the workflow if ANY .exe file is pushed anywhere
+      - '**/*.exe'
   workflow_dispatch: 
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
         with:
           tag_name: desktop-latest
           name: Latest Desktop Build
-          # Grabs the local .exe from the dist folder and attaches it
-          files: DockKubeDesktop/dist/DocKube.exe
+          # Scans the whole repo and uploads every .exe it finds
+          files: "**/*.exe"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
