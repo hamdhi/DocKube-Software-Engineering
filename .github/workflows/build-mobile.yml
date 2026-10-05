@@ -29,14 +29,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           
-      # This official action installs Gradle on the server so we don't need gradlew
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.4' 
+          # Changed from 8.4 to 8.13 to match your project requirements
+          gradle-version: '8.13' 
           
       - name: Build Debug APK
-        # We now use 'gradle' instead of './gradlew'
         run: gradle assembleDebug
         
       - name: Publish to GitHub Releases
