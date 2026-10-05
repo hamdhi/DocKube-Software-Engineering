@@ -12,6 +12,11 @@ jobs:
   build:
     runs-on: windows-latest 
     
+    # This guarantees EVERY step runs exactly inside DockKubeDesktop
+    defaults:
+      run:
+        working-directory: ./DockKubeDesktop
+    
     permissions:
       contents: write 
       
@@ -28,20 +33,16 @@ jobs:
         run: |
           pip install pyinstaller
           
-          # Force the terminal into the correct folder before running
-          cd DockKubeDesktop
-          
-          # Print the files in the folder just to double-check the server sees them
-          dir
-          
-          # Run the build
-          pyinstaller DockKube.spec
+          # Ignore the .spec file and build directly from your app.py file
+          # --windowed hides the background console terminal for GUI apps
+          pyinstaller --onefile --windowed app.py
           
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           tag_name: desktop-latest
           name: Latest Desktop Build
-          files: DockKubeDesktop/dist/*.exe
+          # When building from app.py, the output defaults to the 'dist' folder
+          files: dist/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
