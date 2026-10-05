@@ -1,4 +1,4 @@
-﻿name: Build Kotlin Android App
+name: Build Kotlin Android App
 
 on:
   push:
@@ -32,31 +32,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.14.3' 
+          gradle-version: '8.13' 
           
       - name: Build Debug APK
         run: gradle assembleDebug
-
-      # The app reads this line to tell whether the published build is newer
-      # than the one installed, so it has to match the installed APK exactly.
-      - name: Read the app version
-        run: |
-          VERSION=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
-          CODE=$(sed -n 's/^ *versionCode = \([0-9]*\).*/\1/p' app/build.gradle.kts)
-          if [ -z "$VERSION" ] || [ -z "$CODE" ]; then
-            echo "Could not read versionName/versionCode from app/build.gradle.kts" >&2
-            exit 1
-          fi
-          echo "Publishing DocKube-Android v$VERSION (versionCode $CODE)"
-          echo "DocKube-Android v$VERSION (versionCode $CODE)" > release_body.txt
         
       - name: Publish to GitHub Releases
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
           name: Latest Android Build
-          body_path: release_body.txt
-          # We must manually specify the folder path here for the plugin
           files: DocKubeAndroid/app/build/outputs/apk/debug/*.apk
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
