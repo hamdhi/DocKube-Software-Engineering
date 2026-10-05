@@ -1,0 +1,30 @@
+name: Build Kotlin Android App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'DockKubeAndroid/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # THIS STEP IS CRITICAL: It downloads your repository code to the server
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Build APK
+        # Ensure this EXACTLY matches the folder name in your repo (case-sensitive)
+        working-directory: ./DockKubeAndroid
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
