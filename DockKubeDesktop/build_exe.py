@@ -33,6 +33,8 @@ HIDDEN_IMPORTS = [
 ] + [f"learning_content_{name}" for name in (
     "net1", "net2", "net3", "net4", "net5", "net6", "net7",
     "linux", "se", "sysadmin", "agile", "aws", "delivery", "devops",
+    "security", "firewall", "diagrams", "database",
+    "observability", "sre", "cloud", "fintech", "business",
 )]
 
 # tkinter can drag large unrelated packages into the bundle when they happen to

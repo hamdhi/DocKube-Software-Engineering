@@ -15,8 +15,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONTENT = os.path.join(HERE, "android_content.json")
-SHIPPED = os.path.join(HERE, "DocKubeAndroid", "app", "src", "main", "assets",
-                       "android_content.json")
+# The Android project is a sibling of this folder, not a child, so this has to
+# step up one level. It pointed here before, which made the check below always
+# report the packaged copy missing.
+SHIPPED = os.path.join(HERE, os.pardir, "DocKubeAndroid", "app", "src", "main",
+                       "assets", "android_content.json")
 
 failures = []
 
@@ -37,8 +40,9 @@ print(f"categories: {len(categories)}")
 print(f"chapters  : {len(chapters)}")
 
 # --- structure -------------------------------------------------------------
-check(len(categories) == 20, f"expected 20 categories, got {len(categories)}")
-check(len(chapters) == 15, f"expected 15 chapters (intro + 14), got {len(chapters)}")
+check(len(categories) == 24, f"expected 24 categories, got {len(categories)}")
+# The intro chapter plus one per entry in learning_index.CHAPTERS.
+check(len(chapters) == 24, f"expected 24 chapters (intro + 23), got {len(chapters)}")
 
 for name in categories:
     check(name in commands, f"category {name!r} has no commands entry")

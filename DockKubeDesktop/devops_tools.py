@@ -183,6 +183,30 @@ def add_ansible_tools(app):
     add_command_groups(app, specs.ANSIBLE_GROUPS, specs.ARG_PLACEHOLDERS["ansible"])
     app.add_custom_input()
 
+def add_security_testing_tools(app):
+    """Security testing panel: recon, scanning, and the checks that gate a build."""
+    add_command_groups(app, specs.SECURITY_GROUPS, specs.ARG_PLACEHOLDERS["security"])
+    app.add_cmd_button("Explain OWASP Top 10", "echo Start with the OWASP Top 10, then read the Security Testing chapter")
+    app.add_custom_input()
+
+
+def add_firewall_tools(app):
+    """Firewall panel across ufw, firewalld, nftables and Windows Firewall."""
+    add_command_groups(app, specs.FIREWALL_GROUPS, specs.ARG_PLACEHOLDERS["firewall"])
+    app.add_custom_input()
+
+
+def add_diagram_tools(app):
+    """Diagram tooling panel: PlantUML, Graphviz, Mermaid and schema export."""
+    add_command_groups(app, specs.DIAGRAM_GROUPS, specs.ARG_PLACEHOLDERS["diagram"])
+    app.add_custom_input()
+
+
+def add_database_admin_tools(app):
+    """Database admin panel for Postgres, MySQL and Mongo, plus schema design."""
+    add_command_groups(app, specs.DATABASE_ADMIN_GROUPS, specs.ARG_PLACEHOLDERS["database"])
+    app.add_custom_input()
+
 
 def add_port_manager(app):
     """Mount the live port table with its kill button."""

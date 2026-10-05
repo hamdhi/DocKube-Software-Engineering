@@ -375,6 +375,157 @@ ANSIBLE_GROUPS = [
        ("Init Role", "ansible-galaxy role init {arg}"),
        ("Docs List", "ansible-doc -l")),
 ]
+# --------------------------------------------------------------------------
+# Security testing
+# --------------------------------------------------------------------------
+
+SECURITY_GROUPS = [
+    _g("Reconnaissance",
+       ("Quick Port Scan", "nmap -sV {arg}"),
+       ("Full Service Scan", "nmap -sV -sC -A -p- {arg}"),
+       ("Web App Scan", "nikto -h {arg}"),
+       ("Find Web Files", "feroxbuster -u {arg} -w"),
+       ("Fingerprint the Stack", "whatweb {arg}"),
+       ("DNS Records", "dig {arg}")),
+    _g("Application Scanning",
+       ("OWASP ZAP Baseline", "zap-baseline.py -t {arg}"),
+       ("OWASP ZAP Active Scan", "zap.sh -cmd \"quickurl.cmd -quickurl {arg}\""),
+       ("Nuclei Templates", "nuclei -l {arg}"),
+       ("SQL Injection Probe", "sqlmap -u \"{arg}\" --batch"),
+       ("OpenSSL / TLS Check", "testssl.sh {arg}")),
+    _g("Static Analysis (SAST)",
+       ("Python Bandit", "bandit -r {arg}"),
+       ("Semgrep Rules", "semgrep --config auto {arg}"),
+       ("Brakeman for Rails", "brakeman -q -w {arg}"),
+       ("Secrets in Files", "gitleaks detect --source {arg}")),
+    _g("Dependency Scanning (SCA)",
+       ("Python pip-audit", "pip-audit -r {arg}"),
+       ("Node npm audit", "npm audit --prefix {arg}"),
+       ("OSV Vulnerabilities", "osv-scanner scan source -r {arg}"),
+       ("Trivy Image Scan", "trivy image {arg}"),
+       ("Trivy Filesystem", "trivy fs {arg}")),
+    _g("Container and Host",
+       ("Docker Image CVEs", "trivy image --severity HIGH,CRITICAL {arg}"),
+       ("Cluster Role Review", "kubectl get clusterroles,roles -A"),
+       ("Running Pods and Security Context", "kubectl get pods -A -o wide"),
+       ("Network Policies", "kubectl get networkpolicies -A")),
+    _g("CI/CD Security Gates",
+       ("Run Every SAST Check", "bandit -r src && semgrep --config auto && gitleaks detect"),
+       ("Fail Build on High CVEs", "trivy image --exit-code 1 --severity HIGH,CRITICAL {arg}"),
+       ("Confirm CI Signing Key", "gh secret list"),
+       ("Show Recent Workflow Runs", "gh run list --limit {arg}")),
+]
+
+# --------------------------------------------------------------------------
+# Firewalls
+# --------------------------------------------------------------------------
+
+FIREWALL_GROUPS = [
+    _g("ufw (Ubuntu)",
+       ("Show Status", "ufw status verbose"),
+       ("Enable", "sudo ufw enable"),
+       ("Default Deny Incoming", "sudo ufw default deny incoming"),
+       ("Allow SSH", "sudo ufw allow 22/tcp"),
+       ("Allow HTTP and HTTPS", "sudo ufw allow 80/tcp && sudo ufw allow 443/tcp"),
+       ("Allow From One IP", "sudo ufw allow from {arg}"),
+       ("Delete a Rule", "sudo ufw delete allow {arg}")),
+    _g("firewalld (RHEL/CentOS)",
+       ("Show Active Zone", "sudo firewall-cmd --list-all"),
+       ("Show All Zones", "sudo firewall-cmd --list-all-zones"),
+       ("Allow a Service", "sudo firewall-cmd --permanent --add-service=http && sudo firewall-cmd --reload"),
+       ("Add a Rich Rule", "sudo firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address={arg} port port=443 protocol=tcp accept'"),
+       ("Inspect the Public Zone", "sudo firewall-cmd --zone=public --list-all")),
+    _g("nftables",
+       ("Show Ruleset", "sudo nft list ruleset"),
+       ("Show One Table", "sudo nft list table inet {arg}"),
+       ("Show Ruleset as JSON", "sudo nft -j list ruleset"),
+       ("Flush the Ruleset", "sudo nft flush ruleset")),
+    _g("iptables (legacy)",
+       ("Show Filter Rules", "sudo iptables -L -n -v"),
+       ("Show Rules as Specs", "sudo iptables -S"),
+       ("Allow Established Traffic", "sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"),
+       ("Drop Everything Else", "sudo iptables -A INPUT -j DROP")),
+    _g("Windows Defender Firewall",
+       ("Show Profiles", "netsh advfirewall show allprofiles"),
+       ("Show Firewall Rules", "netsh advfirewall firewall show rule name=all"),
+       ("Enable All Profiles", "netsh advfirewall set allprofiles state on"),
+       ("Allow Inbound a Port", "netsh advfirewall firewall add rule name=\"Allow {arg}\" dir=in action=allow protocol=TCP localport={arg}"),
+       ("Block Outbound for a Program", "netsh advfirewall firewall add rule name=\"Block {arg}\" dir=out action=block program={arg}")),
+    _g("Read the Logs",
+       ("UFW Log File", "sudo tail -n 50 /var/log/ufw.log"),
+       ("Kernel Firewall Messages", "sudo dmesg | findstr /i firewall"),
+       ("Test a Port From Windows", "Test-NetConnection -ComputerName {arg} -Port 443")),
+]
+
+# --------------------------------------------------------------------------
+# Diagrams
+# --------------------------------------------------------------------------
+
+DIAGRAM_GROUPS = [
+    _g("PlantUML",
+       ("Render a File to PNG", "plantuml -tpng {arg}"),
+       ("Render to SVG", "plantuml -tsvg {arg}"),
+       ("Check a File Parses", "plantuml -checkonly {arg}"),
+       ("Serve a Live Editor", "plantuml -server")),
+    _g("Graphviz",
+       ("Render a DOT File", "dot -Tpng {arg} -o diagram.png"),
+       ("Render to SVG", "dot -Tsvg {arg} -o diagram.svg"),
+       ("Render to PDF", "dot -Tpdf {arg} -o diagram.pdf"),
+       ("Check a DOT File", "dot -Tcanon {arg} > NUL")),
+    _g("Mermaid",
+       ("Render to SVG", "mmdc -i {arg} -o diagram.svg"),
+       ("Render to PNG", "mmdc -i {arg} -o diagram.png"),
+       ("Render Every File in a Folder", "mmdc -i docs/ -o out/")),
+    _g("Database Schema Diagrams",
+       ("Render a dbdiagram.io File", "dbml-renderer {arg}"),
+       ("Generate SQL from dbdiagram", "dbml2sql {arg}"),
+       ("Export Schema from Postgres", "pg_dump -s -d {arg} > schema.sql"),
+       ("Export Schema from MySQL", "mysqldump --no-data {arg} > schema.sql")),
+    _g("Architecture as Code",
+       ("Validate PlantUML Source", "plantuml -checkonly {arg}"),
+       ("Count Lines of a Diagram File", "findstr /n /r \"^\" {arg}")),
+]
+
+# --------------------------------------------------------------------------
+# Database administration
+#
+# Distinct from DATABASE_COMMANDS above, which deploys each engine on
+# Kubernetes. These drive a database you already have a client for.
+# --------------------------------------------------------------------------
+
+DATABASE_ADMIN_GROUPS = [
+    _g("PostgreSQL",
+       ("List Databases", "psql -U postgres -c '\\l'"),
+       ("List Tables", "psql -U postgres -d {arg} -c '\\dt'"),
+       ("Describe a Table", "psql -U postgres -d {arg} -c '\\d+'"),
+       ("Show Indexes", "psql -U postgres -d {arg} -c '\\di'"),
+       ("Database Size", "psql -U postgres -c '\\l+'"),
+       ("Vacuum and Analyse", "psql -U postgres -c 'VACUUM ANALYSE;'"),
+       ("Dump Schema Only", "pg_dump -s -d {arg} > schema.sql"),
+       ("Dump Full Database", "pg_dump -d {arg} > dump.sql")),
+    _g("MySQL",
+       ("List Databases", "mysql -u root -p -e 'SHOW DATABASES;'"),
+       ("List Tables", "mysql -u root -p -D {arg} -e 'SHOW TABLES;'"),
+       ("Describe a Table", "mysql -u root -p -D {arg} -e 'DESCRIBE users;'"),
+       ("Show Indexes", "mysql -u root -p -D {arg} -e 'SHOW INDEX FROM users;'"),
+       ("Explain a Query", "mysql -u root -p -D {arg} -e 'EXPLAIN SELECT * FROM users WHERE email=\"a@b.c\";'"),
+       ("Dump Schema Only", "mysqldump --no-data {arg} > schema.sql"),
+       ("Dump Full Database", "mysqldump {arg} > dump.sql")),
+    _g("MongoDB",
+       ("Show Databases", "mongosh --eval 'db.adminCommand({listDatabases:1})'"),
+       ("List Collections", "mongosh {arg} --eval 'db.getCollectionNames()'"),
+       ("Sample Documents", "mongosh {arg} --eval 'db.orders.find().limit(5)'"),
+       ("Explain a Query", "mongosh {arg} --eval 'db.orders.find({status:\"paid\"}).explain(\"executionStats\")'"),
+       ("Create an Index", "mongosh {arg} --eval 'db.orders.createIndex({customerId:1, createdAt:-1})'"),
+       ("List Indexes", "mongosh {arg} --eval 'db.orders.getIndexes()'")),
+    _g("Schema Design and Normalisation",
+       ("Find Duplicate Values", "psql -U postgres -d {arg} -c 'SELECT email, COUNT(*) FROM users GROUP BY email HAVING COUNT(*) > 1;'"),
+       ("Find Rows With Nulls", "psql -U postgres -d {arg} -c 'SELECT COUNT(*) FROM orders WHERE customer_id IS NULL;'"),
+       ("Show Foreign Keys", "psql -U postgres -d {arg} -c '\\d orders'"),
+       ("Check Relationship Cardinality", "psql -U postgres -d {arg} -c 'SELECT customer_id, COUNT(*) FROM orders GROUP BY customer_id ORDER BY 2 DESC LIMIT 10;'"),
+       ("Show Row Counts", "psql -U postgres -d {arg} -c 'SELECT relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;'"),
+       ("Find Unused Indexes", "psql -U postgres -d {arg} -c 'SELECT relname, indexrelname FROM pg_stat_user_indexes WHERE idx_scan = 0;'")),
+]
 
 # Argument placeholders shown for each group type.
 ARG_PLACEHOLDERS = {
@@ -383,4 +534,8 @@ ARG_PLACEHOLDERS = {
     "cicd": "workflow, job, image tag, path...",
     "terraform": "resource address, workspace...",
     "ansible": "playbook.yml, group, module...",
+    "security": "target host, URL, path or scan scope...",
+    "firewall": "port, service name, source IP, rule name...",
+    "diagram": "file to render, e.g. diagram.puml...",
+    "database": "database name, table, or client options...",
 }

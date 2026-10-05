@@ -131,7 +131,8 @@ class App(ctk.CTk):
             "Services", "ReplicaSets", "StatefulSets", "Volumes & PVC",
             "MySQL", "Postgres", "MongoDB", "CI/CD & GitHub Actions",
             "GitHub", "Jenkins", "Terraform", "Ansible", "Port Manager",
-            "Custom", "Networking Masterclass"
+            "Custom", "Networking Masterclass", "Security Testing",
+            "Firewalls", "Diagrams", "Databases"
         ]
         ctk.CTkLabel(self.sidebar, text="DocKube",
                      font=ctk.CTkFont(size=20, weight="bold")).grid(
@@ -290,6 +291,56 @@ class App(ctk.CTk):
             "YAML Editor": "Create Kubernetes manifest files without leaving DocKube. The editor saves `.yaml` or `.yml` files directly into the Working Directory shown above. Choose a starter template, give the file a name, then save it.",
             "Manifest Files": "DocKube automatically finds YAML manifests in the Working Directory. Select one to open it in the editor or apply it to the active Kubernetes cluster—no filename entry required.",
             "Custom": "Enter any free‑form command you want to run – useful for resources not covered by the built‑in shortcuts, such as `ReplicationController` or custom `kubectl` plugins.",
+            "Security Testing": (
+                "Find and fix security problems before users find them for you.\n\n"
+                "The buttons are grouped by the kind of test, which is also the "
+                "order tests usually run in:\n"
+                "• Reconnaissance - map the target with nmap, nikto and whatweb\n"
+                "• Application scanning - OWASP ZAP, nuclei and sqlmap against a running app\n"
+                "• Static analysis (SAST) - read the source without running it (bandit, semgrep, gitleaks)\n"
+                "• Dependency scanning (SCA) - find known CVEs in what you imported (pip-audit, npm audit, trivy)\n"
+                "• Container and host - check images and Kubernetes configuration\n"
+                "• CI/CD gates - the checks that should fail a build automatically\n\n"
+                "Only ever scan systems you own or have written permission to test."
+            ),
+            "Firewalls": (
+                "A firewall is the rulebook that decides which network traffic is "
+                "allowed in, allowed out, or dropped silently.\n\n"
+                "This panel covers the four you will actually meet:\n"
+                "• ufw - the simple front end on Ubuntu\n"
+                "• firewalld - the zone-based equivalent on RHEL, CentOS and Fedora\n"
+                "• nftables - the modern kernel rule engine underneath both\n"
+                "• Windows Defender Firewall - the same idea via netsh on Windows\n\n"
+                "Read the rules before you change them. Enabling a firewall with "
+                "the wrong rules can lock you out of your own machine over SSH, so "
+                "always confirm port 22 (or 3389 for Windows) is allowed first."
+            ),
+            "Diagrams": (
+                "A diagram is an explanation that fits on one screen. Drawing one "
+                "finds the gaps in your thinking faster than talking does.\n\n"
+                "These buttons render and check diagrams rather than draw them "
+                "by hand:\n"
+                "• PlantUML - architecture, UML and sequence diagrams from text\n"
+                "• Graphviz - graph layout, good for dependency and flow graphs\n"
+                "• Mermaid - diagrams that live in Markdown documentation\n"
+                "• dbdiagram.io - database schemas, and it can generate the SQL\n\n"
+                "The Diagrams chapter explains which diagram to reach for, what "
+                "each one is for, and when in the project you should draw it."
+            ),
+            "Databases": (
+                "Designing and querying a database properly is most of what "
+                "separates a working application from a fast one.\n\n"
+                "• Postgres, MySQL and Mongo clients for day-to-day work\n"
+                "• Schema design and normalisation - finding duplicate values, "
+                "stray nulls and unused indexes\n"
+                "• Relationships and cardinality - which tables point at which, "
+                "and how many rows each may have\n"
+                "• The Databases chapter covers normalisation from 1NF to BCNF, "
+                "joins, indexes, and full SQL and NoSQL\n\n"
+                "The MySQL, Postgres and MongoDB categories deploy those engines "
+                "on Kubernetes. This category administers a database you already "
+                "have."
+            ),
             "Networking Masterclass": (
                 "Open the Learning Centre for the full study guide.\n\n"
                 f"{len(learning_index.CHAPTERS)} chapters covering networking "
@@ -374,6 +425,14 @@ class App(ctk.CTk):
             devops_tools.add_ansible_tools(self)
         elif cat == "Port Manager":
             devops_tools.add_port_manager(self)
+        elif cat == "Security Testing":
+            devops_tools.add_security_testing_tools(self)
+        elif cat == "Firewalls":
+            devops_tools.add_firewall_tools(self)
+        elif cat == "Diagrams":
+            devops_tools.add_diagram_tools(self)
+        elif cat == "Databases":
+            devops_tools.add_database_admin_tools(self)
         elif cat == "Custom":
             self.add_custom_input()
         elif cat == "Networking Masterclass":

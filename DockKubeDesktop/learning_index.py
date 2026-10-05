@@ -18,6 +18,15 @@ import learning_content_agile as agile
 import learning_content_aws as aws
 import learning_content_delivery as delivery
 import learning_content_devops as devops
+import learning_content_security as security
+import learning_content_firewall as firewall
+import learning_content_diagrams as diagrams
+import learning_content_database as database
+import learning_content_observability as observability
+import learning_content_sre as sre
+import learning_content_cloud as cloud
+import learning_content_fintech as fintech
+import learning_content_business as business
 
 CHAPTERS = [
     ("Networking Fundamentals", net1.CHAPTER),
@@ -34,6 +43,15 @@ CHAPTERS = [
     ("AWS (2026)", aws.CHAPTER),
     ("Delivery Tooling: CI/CD, Actions, Jenkins, Terraform, Ansible", delivery.CHAPTER),
     ("DevOps and Cloud", devops.CHAPTER),
+    ("Security Testing", security.CHAPTER),
+    ("Firewalls", firewall.CHAPTER),
+    ("Diagrams and Architecture", diagrams.CHAPTER),
+    ("Database Management", database.CHAPTER),
+    ("Observability and Monitoring", observability.CHAPTER),
+    ("Site Reliability Engineering", sre.CHAPTER),
+    ("Cloud Engineer Core Concepts", cloud.CHAPTER),
+    ("FinTech and Payments", fintech.CHAPTER),
+    ("Business Logic and Web Fundamentals", business.CHAPTER),
 ]
 
 INTRO = """<h2>How to Use This Guide</h2>
@@ -67,6 +85,14 @@ works through to cost control.</li>
 GitHub Actions, Jenkins, Terraform and Ansible.</li>
 <li><strong>Managing Windows servers?</strong> Chapter 10 shows every command
 side by side with its Linux equivalent.</li>
+<li><strong>Building for the cloud?</strong> Chapter 21 covers VPCs, subnets,
+IAM, high availability, disaster recovery and FinOps across AWS, Azure and GCP.</li>
+<li><strong>Running things in production?</strong> Chapters 15 to 20 cover security
+testing, firewalls, diagrams, databases, observability and SRE. Read them in that
+order; each one assumes the one before it.</li>
+<li><strong>New to how money and companies work?</strong> Chapters 22 and 23 cover
+payments, receipts, invoices, how shops and SaaS work, and the web security
+vocabulary every developer is expected to know.</li>
 </ul>
 
 <h3>How to actually learn this</h3>

@@ -29,7 +29,7 @@ import urllib.request
 
 # Single source of truth for the desktop version. The publish workflow greps
 # this line out of the file to stamp the release body, so keep the format.
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 RELEASE_URL = ("https://api.github.com/repos/hamdhi/DocKube-Software-Engineering"
                "/releases/tags/desktop-latest")

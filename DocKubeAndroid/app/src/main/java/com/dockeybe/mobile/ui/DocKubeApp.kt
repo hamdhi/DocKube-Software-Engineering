@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -65,6 +66,21 @@ fun DocKubeApp(content: DocKubeContent) {
         UpdateDialog(onDismiss = { showUpdate = false })
     }
 
+    // One definition of "go back", shared by the toolbar arrow and the system
+    // back gesture. A chapter returns to the chapter list because that is
+    // where it was chosen from; everything else returns to the home screen.
+    val goBack: () -> Unit = {
+        screen = when (screen) {
+            is Screen.Chapter -> Screen.ChapterList
+            else -> Screen.Home
+        }
+    }
+
+    // Without this the system back gesture exits the app from anywhere,
+    // because there is no back stack for Compose to pop. Registered only off
+    // the home screen, so back still closes the app from the top.
+    BackHandler(enabled = screen !is Screen.Home) { goBack() }
+
     // Copy and share are needed on several screens, so define them once here.
     val copyText: (String) -> Unit = { text ->
         copyToClipboard(context, text)
@@ -103,12 +119,7 @@ Scaffold(
                 },
                 navigationIcon = {
                     if (screen !is Screen.Home) {
-                        IconButton(onClick = {
-                            screen = when (screen) {
-                                is Screen.Chapter -> Screen.ChapterList
-                                else -> Screen.Home
-                            }
-                        }) {
+                        IconButton(onClick = goBack) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
