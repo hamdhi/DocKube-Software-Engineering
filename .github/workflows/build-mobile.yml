@@ -11,8 +11,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # This guarantees EVERY step runs exactly inside DockKubeAndroid
+    defaults:
+      run:
+        working-directory: ./DockKubeAndroid
+        
+    permissions:
+      contents: write
+
     steps:
-      # THIS STEP IS CRITICAL: It downloads your repository code to the server
       - name: Checkout Code
         uses: actions/checkout@v3
         
@@ -22,9 +30,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           
-      - name: Build APK
-        # Ensure this EXACTLY matches the folder name in your repo (case-sensitive)
-        working-directory: ./DockKubeAndroid
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+        
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: android-latest
+          name: Latest Android Build
+          # Android Studio outputs debug APKs to this standard path
+          files: app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
