@@ -1,20 +1,17 @@
-name: Build Python Desktop App
+name: Publish Local Desktop Build
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'DockKubeDesktop/**'
+      # Tells GitHub to run ONLY when the .exe inside the dist folder is updated
+      - 'DockKubeDesktop/dist/DocKube.exe'
   workflow_dispatch: 
 
 jobs:
-  build:
-    runs-on: windows-latest 
-    
-    defaults:
-      run:
-        working-directory: ./DockKubeDesktop
+  publish:
+    runs-on: ubuntu-latest 
     
     permissions:
       contents: write 
@@ -23,22 +20,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
           
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          
-      - name: Build Windows Executable
-        run: |
-          pip install pyinstaller
-          pyinstaller --onefile --windowed app.py
-          
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           tag_name: desktop-latest
           name: Latest Desktop Build
-          # We must manually specify the folder path here for the plugin
-          files: DockKubeDesktop/dist/*.exe
+          # Grabs the local .exe from the dist folder and attaches it
+          files: DockKubeDesktop/dist/DocKube.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
