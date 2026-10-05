@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      # Only run when files inside the Android folder change
-      - 'DockKubeAndroid/**'
+      - 'DockKubeAndroid/**' # (or DockKubeDesktop/** for the other file)
+  workflow_dispatch: # <--- ADD THIS LINE TO ENABLE MANUAL RUNS
 
 jobs:
   build:
