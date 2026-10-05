@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the cache directory is shared. The downloaded APK lives there and is
+     handed to the package installer through a content:// URI. -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

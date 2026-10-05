@@ -20,12 +20,27 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
           
+      # The app reads this line to tell whether the published build is newer
+      # than the one running, so it has to stay in step with app_update.py.
+      - name: Read the app version
+        run: |
+          VERSION=$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' DockKubeDesktop/app_update.py)
+          if [ -z "$VERSION" ]; then
+            echo "Could not read APP_VERSION from DockKubeDesktop/app_update.py" >&2
+            exit 1
+          fi
+          echo "Publishing DocKube-Desktop v$VERSION"
+          echo "DocKube-Desktop v$VERSION" > release_body.txt
+
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           tag_name: desktop-latest
           name: Latest Desktop Build
-          # Scans the whole repo and uploads every .exe it finds
-          files: "**/*.exe"
+          body_path: release_body.txt
+          # Pinned to the executable build_exe.py produces, so the tag always
+          # points at that one file instead of whatever .exe happens to be
+          # committed. It has to be committed for this workflow to find it.
+          files: DockKubeDesktop/dist/DocKube.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

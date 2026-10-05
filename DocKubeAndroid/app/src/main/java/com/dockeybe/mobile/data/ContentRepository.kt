@@ -9,7 +9,8 @@ import org.json.JSONObject
  *
  * The file is a few hundred kilobytes and is parsed once on first use, off the
  * main thread. Everything ships inside the APK, so the app works with no
- * network and no permissions at all.
+ * network. The only exception is the update check, which has its own
+ * repository in this package.
  */
 object ContentRepository {
 

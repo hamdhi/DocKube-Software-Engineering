@@ -3,8 +3,12 @@
 The phone companion to the DocKube desktop app. It is a **reference**, not a
 tool: it holds every command from the desktop app and the whole Learning Centre,
 so you can look things up and copy commands to your clipboard. It deliberately
-does not try to run Docker or Kubernetes, which is why it needs no permissions
-and no network at all.
+does not try to run Docker or Kubernetes. All of that content ships inside the
+APK, so it works with no network at all.
+
+The one exception is the **Update** button, which checks GitHub for a newer
+build. That is the app's only internet access, and it runs only when you tap
+the button.
 
 ## Install
 

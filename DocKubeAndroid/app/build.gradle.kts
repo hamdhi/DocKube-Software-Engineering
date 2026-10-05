@@ -13,8 +13,10 @@ android {
         minSdk = 24
         // API 36 is Android 16, which is what the Redmi 14 Pro 4G runs.
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // versionCode must rise for the package installer to accept an update;
+        // Android refuses to install over the same or a lower code.
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildTypes {
@@ -39,6 +41,9 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig carries versionName and versionCode, which the update
+        // check compares against the version GitHub publishes.
+        buildConfig = true
     }
 
     packaging {

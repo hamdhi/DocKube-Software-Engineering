@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -38,6 +39,7 @@ fun HomeScreen(
     onCategory: (String) -> Unit,
     onLearning: () -> Unit,
     onSearch: () -> Unit,
+    onUpdate: () -> Unit,
 ) {
     val totalCommands = content.categories.sumOf { it.totalCommands }
     LazyColumn(
@@ -78,6 +80,12 @@ fun HomeScreen(
                             icon = Icons.Default.MenuBook,
                             label = "Learn",
                             onClick = onLearning,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ActionChip(
+                            icon = Icons.Default.SystemUpdateAlt,
+                            label = "Update",
+                            onClick = onUpdate,
                             modifier = Modifier.weight(1f),
                         )
                     }

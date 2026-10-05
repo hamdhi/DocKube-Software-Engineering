@@ -58,6 +58,12 @@ fun DocKubeApp(content: DocKubeContent) {
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    // The update dialog floats over whichever screen is open, so the button
+    // works from anywhere without adding a navigation destination for it.
+    var showUpdate by remember { mutableStateOf(false) }
+    if (showUpdate) {
+        UpdateDialog(onDismiss = { showUpdate = false })
+    }
 
     // Copy and share are needed on several screens, so define them once here.
     val copyText: (String) -> Unit = { text ->
@@ -125,6 +131,7 @@ Scaffold(
                     onCategory = { screen = Screen.Category(it) },
                     onLearning = { screen = Screen.ChapterList },
                     onSearch = { screen = Screen.Search },
+                    onUpdate = { showUpdate = true },
                 )
 
                 is Screen.Category -> {

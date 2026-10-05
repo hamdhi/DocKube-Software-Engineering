@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- No network permission: the app is a fully offline reference. -->
+<!-- The command library ships inside the APK, so nothing here needs backing
+     up. Shared preferences are kept because they hold the digest of the last
+     update check, which the update button compares against. -->
 <full-backup-content>
     <include domain="sharedpref" path="." />
 </full-backup-content>

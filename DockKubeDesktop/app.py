@@ -11,6 +11,7 @@ import io
 import json
 import queue
 
+import app_update
 import devops_tools
 import learning_index
 from docs_content import COMMAND_PREFIXES, EXTRA_DOCS
@@ -218,6 +219,18 @@ class App(ctk.CTk):
                                          text_color="#8b949e", anchor="e")
         self.status_label.grid(row=9, column=0, columnspan=2, padx=20,
                                pady=(0, 4), sticky="ew")
+        # Version and self-update. Row 10 sits below the status line, and both
+        # share the two columns so the button sits under the header controls.
+        self.version_label = ctk.CTkLabel(
+            self.main, text=f"DocKube {app_update.APP_VERSION}",
+            text_color="#8b949e", anchor="w")
+        self.version_label.grid(row=10, column=0, padx=20, pady=(0, 10),
+                                sticky="w")
+        self.update_btn = ctk.CTkButton(
+            self.main, text="Update App", width=120,
+            command=self.check_for_updates)
+        self.update_btn.grid(row=10, column=1, padx=(8, 20), pady=(0, 10),
+                             sticky="e")
         self.actions_scroller = FastScroller(
             self.main, bg=_solid_color(self.main.cget("fg_color")))
         self.actions_scroller.grid(row=4, column=0, columnspan=2, padx=20,
@@ -255,7 +268,6 @@ class App(ctk.CTk):
         # the Tk thread, empties it.
         self._output_queue = queue.Queue()
         self.console = SharedTerminal(on_output=self._output_queue.put)
-        self.status_label = None
         self.configure_content_rows(True)
         # Detailed documentation snippets for DevOps concepts and YAML field guidance
         self.docs = {
@@ -529,6 +541,198 @@ class App(ctk.CTk):
     def _toggle_terminal_pref(self):
         self.open_terminal_on_run = bool(self.terminal_toggle.get())
         self._save_pref("open_terminal_on_run", self.open_terminal_on_run)
+
+    # ------------------------------------------------------------------
+    # Self-update. The check and the download are both network calls, so
+    # each runs on a worker thread and comes back through after(), which is
+    # the only thread allowed to touch widgets.
+    # ------------------------------------------------------------------
+    def check_for_updates(self):
+        """Ask GitHub whether the desktop-latest tag holds a newer build."""
+        self.update_btn.configure(state="disabled", text="Checking...")
+        self.set_status("Checking GitHub for a newer DocKube...")
+        known_digest = self._load_pref("desktop_build_digest", None)
+
+        def task():
+            try:
+                release = app_update.fetch_latest()
+                newer, message = app_update.assess(
+                    release, app_update.APP_VERSION, known_digest)
+                self.after(0, self._update_checked, release, newer, message)
+            except Exception as exc:
+                self.after(0, self._update_failed, exc)
+
+        threading.Thread(target=task, daemon=True).start()
+
+    def _update_failed(self, exc):
+        self.update_btn.configure(state="normal", text="Update App")
+        self.set_status("Update check failed")
+        messagebox.showerror("Update check failed", str(exc), parent=self)
+
+    def _update_checked(self, release, newer, message):
+        self.update_btn.configure(state="normal", text="Update App")
+        self.set_status(message)
+        self.version_label.configure(
+            text=(f"DocKube {app_update.APP_VERSION} - update available" if newer
+                  else f"DocKube {app_update.APP_VERSION}"))
+        self._show_update_dialog(release, newer, message)
+
+    def _show_update_dialog(self, release, newer, message):
+        """Explain what was found, and offer to install it if there is one."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("DocKube Update")
+        dialog.resizable(False, False)
+        dialog.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            dialog,
+            text="A newer DocKube is available" if newer else "You are up to date",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).grid(row=0, column=0, padx=20, pady=(18, 6), sticky="w")
+        ctk.CTkLabel(dialog, text=message, justify="left", wraplength=380,
+                     text_color=("#8b949e", "#8b949e")).grid(
+            row=1, column=0, padx=20, pady=(0, 10), sticky="w")
+
+        facts = ctk.CTkFrame(dialog, fg_color="transparent")
+        facts.grid(row=2, column=0, padx=20, pady=(0, 10), sticky="ew")
+        rows = [
+            ("Installed", f"DocKube {app_update.APP_VERSION}"),
+            ("Published", release.version_label("unversioned build")),
+            ("File", f"{release.asset_name} ({release.size_mb} MB)"),
+            ("Uploaded", (release.published_at or "unknown")[:10]),
+        ]
+        for index, (name, value) in enumerate(rows):
+            ctk.CTkLabel(facts, text=f"{name}:", anchor="w",
+                         width=90, justify="right",
+                         text_color=("#8b949e", "#8b949e")).grid(
+                row=index, column=0, pady=1, sticky="w")
+            ctk.CTkLabel(facts, text=value, anchor="w", justify="left").grid(
+                row=index, column=1, padx=(8, 0), pady=1, sticky="w")
+
+        buttons = ctk.CTkFrame(dialog, fg_color="transparent")
+        buttons.grid(row=3, column=0, padx=20, pady=(0, 18), sticky="ew")
+        ctk.CTkButton(
+            buttons, text="Open release page", width=150,
+            command=lambda: webbrowser.open(release.html_url)).pack(
+                side="left", padx=(0, 8))
+        # Reinstalling is offered even when nothing looks newer: the version
+        # cannot always be read from the feed, and a manual reinstall is a
+        # reasonable thing to want.
+        ctk.CTkButton(
+            buttons, text="Download and install", width=150,
+            fg_color="#238636", hover_color="#2ea043",
+            command=lambda: self.install_update(release)).pack(side="left")
+        dialog.after(50, lambda: dialog.focus_force())
+
+    def install_update(self, release):
+        """Download the new build, then swap it in once DocKube closes."""
+        target = app_update.current_exe_path()
+        if not target:
+            messagebox.showinfo(
+                "Running from source",
+                "DocKube is running from source, so there is no installed "
+                "executable to replace.\n\nBuild it with python build_exe.py "
+                "and run dist\\DocKube.exe to update that copy.",
+                parent=self)
+            return
+        # Checked before the download rather than after: there is no point
+        # pulling 15 MB only to find the folder cannot be written to.
+        if not os.access(os.path.dirname(target), os.W_OK):
+            messagebox.showerror(
+                "Cannot install here",
+                f"{target}\nis not writable.\n\nMove DocKube somewhere you own, "
+                "such as your Downloads folder, and try again.",
+                parent=self)
+            return
+
+        self.update_btn.configure(state="disabled", text="Downloading...")
+        self.set_status(f"Downloading {release.asset_name}...")
+        progress = self._download_dialog(release)
+        staged = os.path.join(
+            os.path.dirname(target), f"{release.asset_name}.new")
+
+        def task():
+            try:
+                app_update.download(
+                    release, staged,
+                    on_progress=lambda done, total: self.after(
+                        0, progress["set"], done, total))
+            except Exception as exc:
+                self.after(0, self._download_failed, progress, exc)
+                return
+            # Recorded only once the bytes are verified, so a later check
+            # compares against a build that is genuinely on disk.
+            self._save_pref("desktop_build_digest", release.sha256)
+            self.after(0, self._download_done, progress, staged, target)
+
+        threading.Thread(target=task, daemon=True).start()
+
+    def _download_failed(self, progress, exc):
+        progress["close"]()
+        self.update_btn.configure(state="normal", text="Update App")
+        self.set_status("Download failed")
+        messagebox.showerror("Download failed", str(exc), parent=self)
+
+    def _download_done(self, progress, staged, target):
+        """Hand off to the detached installer, then close so it can proceed."""
+        progress["close"]()
+        if not messagebox.askyesno(
+                "Install the update",
+                "The update is downloaded.\n\nDocKube will close and restart "
+                "with the new version. Continue?", parent=self):
+            self.update_btn.configure(state="normal", text="Update App")
+            self.set_status("Update downloaded but not installed")
+            return
+        try:
+            app_update.install_downloaded(staged, target)
+        except Exception as exc:
+            messagebox.showerror(
+                "Could not start the installer",
+                f"{exc}\n\nThe new build is at:\n{staged}", parent=self)
+            self.update_btn.configure(state="normal", text="Update App")
+            return
+        self.set_status("Installing the update and restarting")
+        # The helper cannot overwrite a running executable, so the app has to
+        # be gone before it copies anything.
+        self.after(150, self._shutdown)
+
+    def _download_dialog(self, release):
+        """A small window with a progress bar for the download."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Downloading DocKube")
+        dialog.resizable(False, False)
+        dialog.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(dialog, text=release.asset_name, anchor="w").grid(
+            row=0, column=0, padx=20, pady=(16, 4), sticky="w")
+        ctk.CTkLabel(dialog, text="This only takes a moment.", anchor="w",
+                     text_color=("#8b949e", "#8b949e")).grid(
+            row=1, column=0, padx=20, sticky="w")
+        bar = ctk.CTkProgressBar(dialog, width=340)
+        bar.grid(row=2, column=0, padx=20, pady=(14, 6), sticky="w")
+        caption = ctk.CTkLabel(dialog, text="Starting...", anchor="w",
+                               text_color=("#8b949e", "#8b949e"))
+        caption.grid(row=3, column=0, padx=20, pady=(0, 16), sticky="w")
+        # Indeterminate until a total shows up: GitHub redirects the asset
+        # download, and a bar frozen at 0% reads as a hang.
+        bar.configure(mode="indeterminate", indeterminate_speed=1.2)
+        bar.start()
+
+        def set_progress(done, total):
+            if not dialog.winfo_exists():
+                return
+            if total:
+                bar.configure(mode="determinate")
+                bar.stop()
+                bar.set(min(done / total, 1.0))
+                caption.configure(
+                    text=f"{done // 1048576} of {total // 1048576} MB")
+            else:
+                caption.configure(text=f"{done // 1048576} MB")
+
+        def close():
+            if dialog.winfo_exists():
+                dialog.destroy()
+
+        return {"set": set_progress, "close": close}
 
     def run_cmd(self, cmd, callback=None, open_external=None):
         self.terminal.clear()
