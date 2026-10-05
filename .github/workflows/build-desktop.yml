@@ -1,0 +1,40 @@
+name: Build Electron App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Only run when files inside the Desktop folder change
+      - 'DockKubeDesktop/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install and Build Desktop
+        # Execute Python and npm commands strictly inside the Desktop folder
+        working-directory: ./DockKubeDesktop
+        run: |
+          # Example Python build steps
+          pip install -r python-engine/requirements.txt
+          pip install pyinstaller
+          pyinstaller --onefile python-engine/main.py
+          
+          # Example Electron build steps
+          npm install
+          npm run build
+          
+      # Add your softprops/action-gh-release step here
