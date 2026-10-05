@@ -1,0 +1,29 @@
+name: Build Kotlin Android App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Only run when files inside the Android folder change
+      - 'DockKubeAndroid/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Build APK
+        # Execute Gradle commands strictly inside the Android folder
+        working-directory: ./DockKubeAndroid
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          
+      # Add your softprops/action-gh-release step here
