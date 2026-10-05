@@ -1,18 +1,20 @@
-name: Build Electron App
+name: Build Electron Desktop App
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'DockKubeDesktop/**' # (or DockKubeDesktop/** for the other file)
-  workflow_dispatch: # <--- ADD THIS LINE TO ENABLE MANUAL RUNS
+      - 'DockKubeDesktop/**'
+  workflow_dispatch: 
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-latest 
+    
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
       
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -25,16 +27,14 @@ jobs:
           python-version: '3.10'
           
       - name: Install and Build Desktop
-        # Execute Python and npm commands strictly inside the Desktop folder
         working-directory: ./DockKubeDesktop
         run: |
-          # Example Python build steps
-          pip install -r python-engine/requirements.txt
+          # --- PYTHON BUILD STEPS ---
           pip install pyinstaller
-          pyinstaller --onefile python-engine/main.py
           
-          # Example Electron build steps
+          # Replace 'main.py' with the actual name of your Python file!
+          pyinstaller --onefile main.py
+          
+          # --- ELECTRON BUILD STEPS ---
           npm install
           npm run build
-          
-      # Add your softprops/action-gh-release step here
