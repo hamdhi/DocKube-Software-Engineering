@@ -32,7 +32,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          # Changed from 8.4 to 8.13 to match your project requirements
           gradle-version: '8.13' 
           
       - name: Build Debug APK
@@ -43,6 +42,7 @@ jobs:
         with:
           tag_name: android-latest
           name: Latest Android Build
-          files: app/build/outputs/apk/debug/*.apk
+          # We must manually specify the folder path here for the plugin
+          files: DocKubeAndroid/app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
