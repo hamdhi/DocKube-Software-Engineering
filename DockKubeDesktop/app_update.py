@@ -351,13 +351,24 @@ def _installer_script(staged, target, log_path, is_bundle=False):
     beside the exe and replacing only the exe would leave the old ones behind.
     robocopy /MIR also removes files the previous version had and this one does
     not, which is what stops stale DLLs accumulating over many updates.
+
+    robocopy's exit code is a bitmask, not pass/fail: 0-7 means the mirror
+    worked (1 = files copied, which is the normal success), 8+ means real
+    failure. The loop below therefore treats <8 as success and retries
+    otherwise. A bare ``if errorlevel 8`` only catches >= 8, and with no goto
+    on success the old script fell through the loop into ``:failed`` every
+    time: the files were actually replaced but the log claimed failure and
+    the app was never restarted. That is why updates "downloaded but did
+    nothing".
     """
     if is_bundle:
+        launch = os.path.join(target, "DocKube.exe")
         swap = [
             'robocopy "%SOURCE%" "%TARGET%" /MIR /NFL /NDL /NJH /NJS /NP >NUL 2>&1',
-            "if errorlevel 8 goto :failed",
+            "if not errorlevel 8 goto :swapped",
         ]
     else:
+        launch = target
         swap = [
             'copy /Y "%STAGED%" "%TARGET%" >NUL 2>&1',
             'if not errorlevel 1 goto :swapped',
@@ -390,7 +401,7 @@ def _installer_script(staged, target, log_path, is_bundle=False):
         "setlocal",
         f'set "STAGED={staged}"',
         f'set "TARGET={target}"',
-        f'set "LAUNCH={target}"',
+        f'set "LAUNCH={launch}"',
         f'set "SOURCE={staged}"',
         f'set "LOG={log_path}"',
         "",

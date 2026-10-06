@@ -39,6 +39,7 @@ private sealed interface Phase {
     data object Checking : Phase
     data class Result(val outcome: UpdateResult) : Phase
     data class Downloading(val done: Long, val total: Long) : Phase
+    data class HandOff(val message: String) : Phase
     data class Failed(val message: String) : Phase
 }
 
@@ -79,6 +80,7 @@ fun UpdateDialog(onDismiss: () -> Unit) {
                 text = when {
                     phase is Phase.Checking -> "Checking for updates"
                     download != null -> "Downloading"
+                    phase is Phase.HandOff -> "Almost done"
                     (outcome as? UpdateResult.Available) != null -> "Update available"
                     // "You are up to date" would be a claim we cannot make.
                     (outcome as? UpdateResult.Unknown) != null -> "Newest build unknown"
@@ -130,6 +132,7 @@ fun UpdateDialog(onDismiss: () -> Unit) {
                     else -> Text(
                         text = when (val current = phase) {
                             is Phase.Failed -> current.message
+                            is Phase.HandOff -> current.message
                             is Phase.Result -> when (val result = current.outcome) {
                                 is UpdateResult.Available -> describe(result.release)
                                 is UpdateResult.UpToDate -> result.message
@@ -148,6 +151,9 @@ fun UpdateDialog(onDismiss: () -> Unit) {
             when {
                 download != null -> TextButton(onClick = {}, enabled = false) {
                     Text("Downloading...", color = DocMuted)
+                }
+                phase is Phase.HandOff -> TextButton(onClick = onDismiss) {
+                    Text("Done", color = DocAccent)
                 }
                 available != null -> {
                     Row {
@@ -175,6 +181,12 @@ fun UpdateDialog(onDismiss: () -> Unit) {
 /**
  * Download the APK and open the system installer over it.
  *
+ * The digest is deliberately NOT recorded here. The system installer runs in
+ * another process and can fail (signature mismatch) or be cancelled, and
+ * recording the new digest first is what made the next check say "up to
+ * date" while the old build was still installed. The digest is only recorded
+ * when a version check proves the new build is actually on the device.
+ *
  * Failures are reported through the same dialog rather than a toast, which
  * would have vanished before it could be read.
  */
@@ -193,10 +205,24 @@ private suspend fun install(
                 scope.launch { onPhase(Phase.Downloading(done, total)) }
             }
         }
-        // Recorded only once the bytes have been verified.
-        UpdateRepository.rememberInstalled(context, release)
         context.startActivity(UpdateRepository.installIntent(context, apk))
-        onDismiss()
+        // The installer is now in charge; the dialog stays open on a result
+        // screen so a signature-mismatch failure is visible instead of the
+        // app silently looking unchanged. If the user installs, Android
+        // restarts the app into the new build by itself.
+        val installed = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }.getOrNull()
+        onPhase(
+            Phase.HandOff(
+                "The installer should now be open on top of DocKube.\n\n" +
+                    "If it reports a signature or package mismatch, uninstall " +
+                    "the old DocKube first (long-press its icon), then install " +
+                    "this APK fresh — a debug-signed update cannot replace a " +
+                    "differently-signed install.\n\n" +
+                    "Currently installed: ${installed?.versionName ?: "unknown"}."
+            )
+        )
     } catch (exc: Exception) {
         onPhase(Phase.Failed(exc.message ?: "The update could not be downloaded"))
     }

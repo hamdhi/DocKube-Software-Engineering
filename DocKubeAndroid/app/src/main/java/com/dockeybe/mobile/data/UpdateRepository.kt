@@ -91,7 +91,17 @@ object UpdateRepository {
         release.version?.let { remote ->
             val comparison = compareVersions(remote, current)
             if (comparison > 0) return UpdateResult.Available(release)
-            if (comparison == 0) return UpdateResult.UpToDate("DocKube $current is already installed.")
+            if (comparison == 0) {
+                // Proven: the published version is the installed one, so the
+                // published bytes are on this device. Only now is the digest
+                // worth remembering. Recording it at download time (before the
+                // system installer runs) is what made a failed install look
+                // "up to date" on the next check.
+                if (release.sha256.isNotEmpty()) {
+                    prefs(context).edit().putString(PREF_DIGEST, release.sha256).apply()
+                }
+                return UpdateResult.UpToDate("DocKube $current is already installed.")
+            }
         }
 
         if (!knownDigest.isNullOrEmpty() && release.sha256.isNotEmpty()) {
@@ -260,7 +270,15 @@ object UpdateRepository {
         }
     }
 
-    /** Remember the build that was actually installed, for the next comparison. */
+    /**
+     * Remember the build that was actually installed, for the next comparison.
+     *
+     * Only call this when the new version is proven to be on the device
+     * (version equality in check(), or right after the system installer
+     * reports success). Recording the digest at download time makes a failed
+     * or cancelled install look "up to date" on the next check, because the
+     * digest matches while the old APK is still installed.
+     */
     fun rememberInstalled(context: Context, release: ReleaseInfo) {
         if (release.sha256.isNotEmpty()) {
             prefs(context).edit().putString(PREF_DIGEST, release.sha256).apply()
