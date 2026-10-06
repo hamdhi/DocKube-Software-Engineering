@@ -15,8 +15,8 @@ android {
         targetSdk = 36
         // versionCode must rise for the package installer to accept an update;
         // Android refuses to install over the same or a lower code.
-        versionCode = 4
-        versionName = "1.3.0"
+        versionCode = 5
+        versionName = "1.4.0"
     }
 
     buildTypes {

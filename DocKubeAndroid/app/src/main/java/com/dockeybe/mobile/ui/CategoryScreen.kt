@@ -24,6 +24,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,11 +43,25 @@ fun CategoryScreen(
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
     onLearning: () -> Unit,
+    onScrollIndexChanged: (Int) -> Unit,
+    savedScrollIndex: Int,
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(savedScrollIndex) {
+        if (savedScrollIndex >= 0) {
+            listState.scrollToItem(savedScrollIndex)
+        }
+    }
+
     // "Custom" is a free-text box on the desktop and "Networking Masterclass"
     // is only a launcher, so neither has commands worth listing here.
     if (category.name == "Networking Masterclass") {
-        LearningLauncher(onLearning = onLearning)
+        LearningLauncher(
+            onLearning = onLearning,
+            onScrollIndexChanged = onScrollIndexChanged,
+            listState = listState,
+        )
         return
     }
     if (category.name == "Custom") {
@@ -58,6 +75,7 @@ fun CategoryScreen(
     }
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize().background(DocBackground),
         contentPadding = ScreenPadding,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -172,7 +190,11 @@ fun NoteCard(title: String, body: String) {
 }
 
 @Composable
-private fun LearningLauncher(onLearning: () -> Unit) {
+private fun LearningLauncher(
+    onLearning: () -> Unit,
+    onScrollIndexChanged: (Int) -> Unit,
+    listState: LazyListState,
+) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         NoteCard(
             title = "Networking Masterclass",
@@ -185,7 +207,10 @@ private fun LearningLauncher(onLearning: () -> Unit) {
         Card(
             colors = CardDefaults.cardColors(containerColor = DocAccent),
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onLearning),
+            modifier = Modifier.fillMaxWidth().clickable {
+                onScrollIndexChanged(listState.firstVisibleItemIndex)
+                onLearning()
+            },
         ) {
             Row(
                 Modifier.padding(14.dp),

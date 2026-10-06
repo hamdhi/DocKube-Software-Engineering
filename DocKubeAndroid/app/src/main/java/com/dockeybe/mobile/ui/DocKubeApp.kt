@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +66,13 @@ fun DocKubeApp(content: DocKubeContent) {
     if (showUpdate) {
         UpdateDialog(onDismiss = { showUpdate = false })
     }
+
+    // Scroll positions for the chapter list and category pages are kept alive
+    // at the app level so they survive navigating away (to a chapter, or back
+    // to home) and re-entering. They are restored on entry and updated when the
+    // user taps an item to leave.
+    var chapterListScrollIndex by rememberSaveable { mutableStateOf(-1) }
+    var categoryScrollIndex by rememberSaveable { mutableStateOf(-1) }
 
     // One definition of "go back", shared by the toolbar arrow and the system
     // back gesture. A chapter returns to the chapter list because that is
@@ -153,12 +161,16 @@ Scaffold(
                         onCopy = copyText,
                         onShare = shareText,
                         onLearning = { screen = Screen.ChapterList },
+                        onScrollIndexChanged = { categoryScrollIndex = it },
+                        savedScrollIndex = categoryScrollIndex,
                     )
                 }
 
                 is Screen.ChapterList -> ChapterListScreen(
                     content = content,
                     onOpen = { screen = Screen.Chapter(it) },
+                    onScrollIndexChanged = { chapterListScrollIndex = it },
+                    savedScrollIndex = chapterListScrollIndex,
                 )
 
                 is Screen.Chapter -> {

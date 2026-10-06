@@ -20,7 +20,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -35,8 +37,19 @@ import com.dockeybe.mobile.data.DocKubeContent
 fun ChapterListScreen(
     content: DocKubeContent,
     onOpen: (String) -> Unit,
+    onScrollIndexChanged: (Int) -> Unit,
+    savedScrollIndex: Int,
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(savedScrollIndex) {
+        if (savedScrollIndex >= 0) {
+            listState.scrollToItem(savedScrollIndex)
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize().background(DocBackground),
         contentPadding = ScreenPadding,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -49,7 +62,13 @@ fun ChapterListScreen(
             )
         }
         items(content.chapters, key = { it.title }) { chapter ->
-            ChapterRow(chapter = chapter, onClick = { onOpen(chapter.title) })
+            ChapterRow(
+                chapter = chapter,
+                onClick = {
+                    onScrollIndexChanged(listState.firstVisibleItemIndex)
+                    onOpen(chapter.title)
+                },
+            )
         }
     }
 }

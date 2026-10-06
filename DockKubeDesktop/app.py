@@ -858,6 +858,10 @@ class App(ctk.CTk):
 
     def _capture_output(self, cmd, callback):
         """Run a command here and stream its output into the app."""
+        # Open the terminal so the user can see the output even when the toggle
+        # is off; run_cmd routed around the shared console, so without this the
+        # user would not notice anything running at all.
+        self.terminal.set_output_collapsed(False)
         directory = self._work_dir()
         def task():
             try:
