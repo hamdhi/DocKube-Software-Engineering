@@ -27,6 +27,26 @@ import learning_content_sre as sre
 import learning_content_cloud as cloud
 import learning_content_fintech as fintech
 import learning_content_business as business
+import learning_content_testing as testing
+import learning_content_deployment as deployment
+import learning_content_auth as auth
+import learning_content_python_adv as python_adv
+import learning_content_python_internals as python_internals
+import learning_content_fastapi as fastapi
+import learning_content_email as email
+import learning_content_crypto as crypto
+import learning_content_net_advanced as net_advanced
+import learning_content_ccna as ccna
+import learning_content_packettracer as packettracer
+import learning_content_windows_admin as windows_admin
+import learning_content_linux_admin as linux_admin
+import learning_content_kernel as kernel
+import learning_content_diagnostics as diagnostics
+import learning_content_ml as ml
+import learning_content_ai_models as ai_models
+import learning_content_ai_engineering as ai_engineering
+import learning_content_platform as platform
+import learning_content_docker as docker_chapter
 
 CHAPTERS = [
     ("Networking Fundamentals", net1.CHAPTER),
@@ -52,6 +72,26 @@ CHAPTERS = [
     ("Cloud Engineer Core Concepts", cloud.CHAPTER),
     ("FinTech and Payments", fintech.CHAPTER),
     ("Business Logic and Web Fundamentals", business.CHAPTER),
+    ("Software Testing", testing.CHAPTER),
+    ("Deployment Strategies", deployment.CHAPTER),
+    ("Authentication and TLS", auth.CHAPTER),
+    ("Advanced Python", python_adv.CHAPTER),
+    ("Python Internals", python_internals.CHAPTER),
+    ("FastAPI", fastapi.CHAPTER),
+    ("Email Systems", email.CHAPTER),
+    ("Cryptography", crypto.CHAPTER),
+    ("Advanced Networking", net_advanced.CHAPTER),
+    ("CCNA", ccna.CHAPTER),
+    ("Packet Tracer", packettracer.CHAPTER),
+    ("Windows Administration", windows_admin.CHAPTER),
+    ("Linux Administration", linux_admin.CHAPTER),
+    ("Linux Kernel", kernel.CHAPTER),
+    ("Diagnostics and Troubleshooting", diagnostics.CHAPTER),
+    ("Machine Learning", ml.CHAPTER),
+    ("AI Models", ai_models.CHAPTER),
+    ("AI Engineering and RAG", ai_engineering.CHAPTER),
+    ("Platform Engineering", platform.CHAPTER),
+    ("Docker Deep Dive", docker_chapter.CHAPTER),
 ]
 
 INTRO = """<h2>How to Use This Guide</h2>
@@ -93,6 +133,11 @@ order; each one assumes the one before it.</li>
 <li><strong>New to how money and companies work?</strong> Chapters 22 and 23 cover
 payments, receipts, invoices, how shops and SaaS work, and the web security
 vocabulary every developer is expected to know.</li>
+<li><strong>Want depth beyond the basics?</strong> Chapters 24 onward go deeper:
+testing, deployment strategies, auth and TLS, advanced Python and its
+internals, FastAPI, email, cryptography, advanced networking, CCNA and Packet
+Tracer, Linux and Windows administration, the kernel, diagnostics, machine
+learning and AI, platform engineering, and a Docker deep dive.</li>
 </ul>
 
 <h3>How to actually learn this</h3>

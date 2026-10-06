@@ -176,9 +176,10 @@ private fun LearningLauncher(onLearning: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         NoteCard(
             title = "Networking Masterclass",
-            body = "Fourteen chapters covering IP addresses, subnetting, ports, " +
+            body = "Forty-plus chapters covering IP addresses, subnetting, ports, " +
                 "TCP vs UDP, protocols, network devices, the Linux command line, " +
-                "software engineering, sysadmin and DevOps.",
+                "software engineering, sysadmin, DevOps, Docker, testing, " +
+                "Python, AI, and more.",
         )
         Spacer(Modifier.height(12.dp))
         Card(

@@ -9,6 +9,7 @@ buttons run through ``app.run_cmd``, templates are written into the selected
 working directory, and long-running probes run in a background thread.
 """
 
+import html
 import os
 import subprocess
 import threading
@@ -41,7 +42,13 @@ def capture_cmd(app, command, callback=None):
 
 
 def resolve_command(template, argument):
-    """Substitute ``{arg}``; returns None when the argument is required."""
+    """Substitute ``{arg}``; returns None when the argument is required.
+
+    The spec holds plain shell text, but defensively unescape any HTML
+    entities (``&amp;``, ``&lt;`` ...) so a stray entity can never leak
+    into the shell as a literal.
+    """
+    template = html.unescape(template)
     if "{arg}" not in template:
         return template
     argument = (argument or "").strip()
@@ -182,6 +189,15 @@ def add_ansible_tools(app):
     add_template_saver(app, "Write inventory.ini", *templates.AUX_TEMPLATES["Ansible Inventory"])
     add_command_groups(app, specs.ANSIBLE_GROUPS, specs.ARG_PLACEHOLDERS["ansible"])
     app.add_custom_input()
+
+def add_docker_tools(app):
+    """The complete Docker panel: every command group plus starter files."""
+    add_command_groups(app, specs.DOCKER_GROUPS,
+                       specs.ARG_PLACEHOLDERS["docker"])
+    for label in ("Dockerfile", "docker-compose.yml", ".dockerignore"):
+        add_template_saver(app, f"Write {label}", *templates.AUX_TEMPLATES[label])
+    app.add_custom_input()
+
 
 def add_security_testing_tools(app):
     """Security testing panel: recon, scanning, and the checks that gate a build."""

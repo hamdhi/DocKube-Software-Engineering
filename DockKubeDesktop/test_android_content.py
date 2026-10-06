@@ -42,7 +42,10 @@ print(f"chapters  : {len(chapters)}")
 # --- structure -------------------------------------------------------------
 check(len(categories) == 24, f"expected 24 categories, got {len(categories)}")
 # The intro chapter plus one per entry in learning_index.CHAPTERS.
-check(len(chapters) == 24, f"expected 24 chapters (intro + 23), got {len(chapters)}")
+import learning_index as _li
+_expected_chapters = 1 + len(_li.CHAPTERS)
+check(len(chapters) == _expected_chapters,
+      f"expected {_expected_chapters} chapters (intro + {len(_li.CHAPTERS)}), got {len(chapters)}")
 
 for name in categories:
     check(name in commands, f"category {name!r} has no commands entry")

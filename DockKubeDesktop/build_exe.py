@@ -48,6 +48,10 @@ HIDDEN_IMPORTS = [
     "linux", "se", "sysadmin", "agile", "aws", "delivery", "devops",
     "security", "firewall", "diagrams", "database",
     "observability", "sre", "cloud", "fintech", "business",
+    "testing", "deployment", "auth", "python_adv", "python_internals",
+    "fastapi", "email", "crypto", "net_advanced", "ccna", "packettracer",
+    "windows_admin", "linux_admin", "kernel", "diagnostics", "ml",
+    "ai_models", "ai_engineering", "platform", "docker",
 )]
 
 # tkinter can drag large unrelated packages into the bundle when they happen to

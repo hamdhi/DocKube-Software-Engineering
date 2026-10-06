@@ -460,7 +460,95 @@ Important notes:
 - The Kill button blocks PID 0, PID 4 and core Windows services
 - Admin rights are required to terminate protected processes"""
 
+DOCKER_DOC = """Docker - the Complete CLI
+
+Docker packages applications into lightweight containers. An image is a
+read-only template of filesystem layers; a container is a running instance
+of an image. This panel covers the whole CLI the way it is actually used.
+
+Key concepts:
+- Image is read-only, container adds a writable layer on top
+- Build with docker build, run with docker run, clean with prune
+- Bind mounts share host folders, named volumes persist data
+- Networks isolate containers; user-defined networks give DNS names
+
+Common commands:
+    docker version
+    docker info
+    docker system df
+    docker run -d --name web -p 8080:80 nginx:alpine
+    docker ps -a
+    docker logs -f web
+    docker exec -it web sh
+    docker build -t app:dev .
+    docker build -t app:dev . && docker image prune -f
+    docker compose up -d --build
+    docker system prune
+
+Starter files:
+- Write Dockerfile for a multi-stage, non-root Python image
+- Write docker-compose.yml for a web plus Postgres stack
+- Write .dockerignore to keep the build context small
+
+Important notes:
+- Read docker system df before any prune
+- docker volume prune DELETES DATA - confirm the volume first
+- Never use latest in production; pin the tag"""
+
+SECURITY_DOC = """Security Testing
+
+Security testing finds the vulnerabilities before someone else does. Only
+ever scan systems you own or have written permission to test.
+
+Key concepts:
+- Recon maps the target: DNS, ports, services, technology
+- Scanning finds known vulnerabilities: Nikto, Nuclei, sqlmap
+- SAST reads the code: Bandit, Semgrep, Gitleaks for secrets
+- CI/CD gates fail the build when a check fails
+- OWASP Top 10 is the starting vocabulary
+
+Common commands:
+    nmap -sV target
+    nikto -h http://target
+    nuclei -u http://target
+    sqlmap -u http://target/page?id=1 --batch
+    bandit -r src
+    semgrep --config auto
+    gitleaks detect
+    bandit -r src && semgrep --config auto && gitleaks detect
+
+Important notes:
+- Unauthorised scanning is illegal in most jurisdictions
+- Gate the build: SAST plus secret scanning on every pull request
+- Start with the OWASP Top 10, then read the Security Testing chapter"""
+
+DATABASES_DOC = """Database Administration
+
+Designing and querying a database properly is most of what separates a
+working application from a fast one. This panel administers a database you
+already have a client for - distinct from the MySQL, Postgres and MongoDB
+categories, which deploy each engine on Kubernetes.
+
+Key concepts:
+- psql is the Postgres client, mysql the MySQL client, mongosh the Mongo one
+- pg_dump and mysqldump take logical backups; restore with psql or mysql
+- EXPLAIN shows the query plan before the query hurts production
+- Indexes speed reads and slow writes; unused ones are pure cost
+
+Common commands:
+    psql -U postgres -c '\\l'
+    mysql -u root -p -e 'SHOW DATABASES;'
+    mongosh --eval 'db.adminCommand({listDatabases:1})'
+    pg_dump -d mydb > dump.sql
+    mysqldump mydb > dump.sql
+
+Important notes:
+- Back up with a dump before any destructive operation
+- Deleting a StatefulSet leaves the PVCs behind by design
+- Parameterise every query; never interpolate input into raw SQL"""
+
 EXTRA_DOCS = {
+    "Docker": DOCKER_DOC,
     "MySQL": MYSQL_DOC,
     "Postgres": POSTGRES_DOC,
     "MongoDB": MONGODB_DOC,
@@ -470,4 +558,6 @@ EXTRA_DOCS = {
     "Terraform": TERRAFORM_DOC,
     "Ansible": ANSIBLE_DOC,
     "Port Manager": PORT_MANAGER_DOC,
+    "Security Testing": SECURITY_DOC,
+    "Databases": DATABASES_DOC,
 }

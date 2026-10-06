@@ -14,6 +14,7 @@ the project.
 
 import html
 import re
+import sys
 import textwrap
 import tkinter
 import tkinter as tk
@@ -408,6 +409,27 @@ class TableWidget(tk.Frame):
         self.configure(height=self._last_height)
 
 
+class _Pane(ctk.CTkScrollableFrame):
+    """A scrollable pane whose CustomTkinter wheel bindings are muted.
+
+    ``CTkScrollableFrame`` registers ``<MouseWheel>`` (and the shift keys)
+    through ``bind_all()`` in its constructor. Those Tcl callbacks are owned
+    by the widget: destroying the Learning window deletes them, but the
+    script stays in the application's ``all`` tag. On the next open the new
+    handlers are appended *behind* the dead ones, so every wheel event dies
+    on the stale entry and nothing after it ever runs.
+
+    DocKube drives scrolling from one long-lived dispatcher instead (see
+    ``LearningWindow._register_wheel``), so the widget's own registration is
+    simply dropped here at construction.
+    """
+
+    def bind_all(self, sequence=None, func=None, add=None):
+        # Deliberately a no-op: the constructor's bind_all() calls are the
+        # only ones this widget ever makes.
+        return None
+
+
 class LearningWindow(ctk.CTkToplevel):
     """The popup study guide.
 
@@ -419,6 +441,12 @@ class LearningWindow(ctk.CTkToplevel):
     # Parsed chapters, shared across popups so revisiting one is instant.
     _block_cache = {}
 
+    # One application-wide wheel handler per process. It is bound to the main
+    # window (which outlives every popup) and routes to whichever Learning
+    # window is currently open, so no handler is ever added or removed again.
+    _wheel_host = None
+    _active = None
+
     def __init__(self, master, chapters):
         super().__init__(master)
         self.chapters = chapters
@@ -428,7 +456,85 @@ class LearningWindow(ctk.CTkToplevel):
         self.configure(fg_color=BG)
         self._section_marks = []
         self._toc_buttons = {}
+        # Register before building: _Pane has muted the widget-level
+        # handlers, so the dispatcher must be in place before any event.
+        LearningWindow._active = self
+        self._register_wheel(master)
         self._build()
+
+    @classmethod
+    def _register_wheel(cls, host):
+        """Bind the wheel helper exactly once, on a widget that never dies."""
+        if cls._wheel_host is not None:
+            return
+        cls._wheel_host = host
+        host.bind_all("<MouseWheel>", cls._on_wheel, add="+")
+        host.bind_all("<Button-4>", cls._on_wheel, add="+")
+        host.bind_all("<Button-5>", cls._on_wheel, add="+")
+
+    @classmethod
+    def _on_wheel(cls, event):
+        """Scroll the pane under the pointer, exactly once per event.
+
+        Two bugs are solved in one handler. CustomTkinter converts the wheel
+        to ``-int(delta / 6)`` units on Windows, which truncates the small
+        deltas a precision touchpad emits down to zero -- that is why
+        two-finger scrolling felt dead. And because CustomTkinter's own
+        handlers are muted in ``_Pane``, this performs the full conversion
+        for every event, with the same sign convention as everywhere else in
+        DocKube: positive delta (wheel rolled away from the user) scrolls up.
+        """
+        window = cls._active
+        if window is None:
+            return
+        try:
+            if not window.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        canvas = window._pane_canvas(getattr(event, "widget", None))
+        if canvas is None:
+            return
+        num = getattr(event, "num", 0)
+        if num in (4, 5):
+            units = -1 if num == 4 else 1
+        else:
+            delta = getattr(event, "delta", 0)
+            if delta == 0:
+                return
+            if sys.platform.startswith("win"):
+                units = -int(delta / 6)
+                if units == 0:
+                    # The touchpad micro-deltas int(delta / 6) swallows.
+                    units = -1 if delta > 0 else 1
+            elif sys.platform == "darwin":
+                units = -delta
+            else:
+                units = -1 if delta > 0 else 1
+        try:
+            canvas.yview_scroll(units, "units")
+        except tk.TclError:
+            return
+
+    def _pane_canvas(self, widget):
+        """The canvas of the pane ``widget`` belongs to, or None."""
+        outer = getattr(self, "outer", None)
+        toc = getattr(self, "_toc", None)
+        if outer is None or toc is None:
+            return None
+        current = widget
+        while current is not None:
+            if current is outer or current is outer._parent_canvas:
+                return outer._parent_canvas
+            if current is toc or current is toc._parent_canvas:
+                return toc._parent_canvas
+            current = getattr(current, "master", None)
+        return None
+
+    def destroy(self):
+        if LearningWindow._active is self:
+            LearningWindow._active = None
+        super().destroy()
 
     def _build(self):
         self.grid_columnconfigure(1, weight=1)
@@ -459,10 +565,11 @@ class LearningWindow(ctk.CTkToplevel):
                      font=ctk.CTkFont(weight="bold"), text_color=MUTED).grid(
             row=0, column=0, padx=14, pady=(12, 6), sticky="w")
 
-        toc = ctk.CTkScrollableFrame(sidebar, fg_color="transparent",
-                                     scrollbar_button_color="#30363d",
-                                     scrollbar_button_hover_color="#484f58")
+        toc = _Pane(sidebar, fg_color="transparent",
+                    scrollbar_button_color="#30363d",
+                    scrollbar_button_hover_color="#484f58")
         toc.grid(row=1, column=0, sticky="nsew", padx=(6, 2), pady=(0, 4))
+        self._toc = toc
         for index, (title, _body) in enumerate(self.chapters):
             button = ctk.CTkButton(
                 toc, text=title, anchor="w", fg_color="transparent",
@@ -486,7 +593,7 @@ class LearningWindow(ctk.CTkToplevel):
 
         # Tables are embedded as real child widgets inside this frame so they
         # scroll together with the surrounding text.
-        self.outer = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.outer = _Pane(self, fg_color="transparent")
         self.outer.grid(row=1, column=1, sticky="nsew", padx=16, pady=4)
         self.outer.grid_columnconfigure(0, weight=1)
 

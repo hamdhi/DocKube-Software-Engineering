@@ -408,6 +408,78 @@ ansible_python_interpreter=/usr/bin/python3
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 """
 
+# Docker starter files written into the working directory.
+DOCKERFILE = """# DocKube starter Dockerfile - multi-stage, non-root, health-checked.
+FROM python:3.12-slim AS build
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+FROM python:3.12-slim
+RUN useradd -r -s /usr/sbin/nologin appuser
+WORKDIR /srv
+COPY --from=build /usr/local/lib/python3.12/site-packages \\
+                  /usr/local/lib/python3.12/site-packages
+COPY --from=build /app .
+USER appuser
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \\
+  CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+"""
+
+DOCKER_COMPOSE = """# DocKube starter docker-compose.yml
+# Usage: docker compose up -d --build      |      docker compose logs -f web
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8000"
+    env_file: [.env]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 10s
+      retries: 5
+
+volumes:
+  pgdata:
+"""
+
+DOCKERIGNORE = """.git
+.gitignore
+__pycache__
+*.pyc
+.venv
+venv
+node_modules
+.env
+*.md
+tests
+.pytest_cache
+dist
+build
+"""
+
 MANIFEST_TEMPLATES = {
     "MySQL": ("mysql.yaml", MYSQL_MANIFEST),
     "Postgres": ("postgres.yaml", POSTGRES_MANIFEST),
@@ -421,4 +493,7 @@ AUX_TEMPLATES = {
     "Terraform main.tf": ("main.tf", TERRAFORM_MAIN),
     "Ansible Playbook": ("playbook.yml", ANSIBLE_PLAYBOOK),
     "Ansible Inventory": ("inventory.ini", ANSIBLE_INVENTORY),
+    "Dockerfile": ("Dockerfile", DOCKERFILE),
+    "docker-compose.yml": ("docker-compose.yml", DOCKER_COMPOSE),
+    ".dockerignore": (".dockerignore", DOCKERIGNORE),
 }

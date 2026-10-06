@@ -17,6 +17,26 @@ that scrolled a CustomTkinter frame keep working.
 import tkinter as tk
 
 
+# One application-wide wheel callback for every FastScroller.
+#
+# Each instance used to bind_all() itself on <Enter> and call unbind_all() on
+# <Leave>. That did two pieces of damage: it wiped every other widget's
+# application-wide wheel handler -- including the Learning Centre's, which is
+# why two-finger trackpad scrolling stopped working there -- and, because
+# bind scripts outlive the widget that registered them, destroyed scrollers
+# left stale Tcl callbacks behind that aborted every handler bound after
+# them. A single dispatcher registered on the main window lives for the life
+# of the app instead; individual scrollers simply come and go from the set.
+_scrollers = set()
+_dispatcher_bound = False
+
+
+def _dispatch_wheel(event):
+    """Forward one wheel event to every live scroller; each gates itself."""
+    for scroller in list(_scrollers):
+        scroller._on_wheel(event)
+
+
 class FastScroller(tk.Frame):
     """A vertically scrollable container.
 
@@ -51,10 +71,25 @@ class FastScroller(tk.Frame):
 
         self.body.bind("<Configure>", self._on_body)
         self.canvas.bind("<Configure>", self._on_canvas)
-        self.canvas.bind("<Enter>", self._bind_wheel)
-        self.canvas.bind("<Leave>", self._unbind_wheel)
         self._bar.bind("<Button-1>", self._bar_press)
         self._bar.bind("<B1-Motion>", self._bar_drag)
+
+        global _dispatcher_bound
+        _scrollers.add(self)
+        if not _dispatcher_bound:
+            _dispatcher_bound = True
+            # The host is the toplevel this scroller lives in (the main
+            # DocKube window), which outlives every scroller. Binding here
+            # exactly once means no handler is ever added or removed again,
+            # so no other widget's wheel handling can be disturbed.
+            host = self.winfo_toplevel()
+            host.bind_all("<MouseWheel>", _dispatch_wheel, add="+")
+            host.bind_all("<Button-4>", _dispatch_wheel, add="+")
+            host.bind_all("<Button-5>", _dispatch_wheel, add="+")
+
+    def destroy(self):
+        _scrollers.discard(self)
+        super().destroy()
 
     # ------------------------------------------------------------------
     # Layout
@@ -79,17 +114,8 @@ class FastScroller(tk.Frame):
             current = getattr(current, "master", None)
         return False
 
-    def _bind_wheel(self, _event=None):
-        self.canvas.bind_all("<MouseWheel>", self._on_wheel, add="+")
-        self.canvas.bind_all("<Button-4>", self._on_wheel, add="+")
-        self.canvas.bind_all("<Button-5>", self._on_wheel, add="+")
-
-    def _unbind_wheel(self, _event=None):
-        for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
-            self.canvas.unbind_all(sequence)
-
     def _on_wheel(self, event):
-        # Nested scrollers all bind globally, so only the one actually under
+        # Scrollers all register globally, so only the one actually under
         # the pointer may react.
         if not self._is_inside(getattr(event, "widget", None)):
             return
@@ -99,7 +125,11 @@ class FastScroller(tk.Frame):
             delta = 1
         else:
             delta = -1 if event.delta > 0 else 1
-        self.canvas.yview_scroll(delta, "units")
+        try:
+            self.canvas.yview_scroll(delta, "units")
+        except tk.TclError:
+            # A scroller destroyed mid-dispatch must not crash the callback.
+            return
 
     def yview(self):
         return self.canvas.yview()

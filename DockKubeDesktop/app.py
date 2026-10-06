@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import html
 import subprocess
 import threading
 import os
@@ -348,7 +349,7 @@ class App(ctk.CTk):
                 "fundamentals, IP addresses, subnetting, ports, TCP vs UDP, "
                 "protocols, network devices, the Linux command line and "
                 "permissions, software engineering, Linux and Windows "
-                "sysadmin, and DevOps.\n\n"
+                "sysadmin, DevOps, Docker, testing, Python, AI and more.\n\n"
                 "Every chapter explains the theory in plain English, shows "
                 "the real commands, gives memory tricks, includes a "
                 "Learning vs Production comparison, and ends with an "
@@ -388,7 +389,7 @@ class App(ctk.CTk):
         elif cat == "Docker":
             self.add_cmd_button("List Containers", "docker ps -a")
             self.add_cmd_button("List Images", "docker images")
-            self.add_custom_input()
+            devops_tools.add_docker_tools(self)
         elif cat == "Minikube/Kind":
             self.add_cmd_button("Start Minikube", "minikube start")
             self.add_cmd_button("Start Kind", "kind create cluster")
@@ -485,6 +486,7 @@ class App(ctk.CTk):
         self.doc_text.insert("end", f"{title}\n", "title")
         for raw_line in content.splitlines():
             line = re.sub(r"<[^>]+>", "", raw_line).strip()
+            line = html.unescape(line)
             line = re.sub(r"\*\*(.*?)\*\*", r"\1", line)
             # Measure indentation before stripping, otherwise indented
             # commands such as "    terraform init" lose their colour.

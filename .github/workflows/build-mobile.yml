@@ -34,14 +34,23 @@ jobs:
         with:
           gradle-version: '8.13' 
           
+      - name: Stamp the release body
+        run: |
+          VERSION=$(grep -m1 '^ *versionName *= *"' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          CODE=$(grep -m1 '^ *versionCode *= *[0-9]*' app/build.gradle.kts | grep -o '[0-9]*')
+          if [ -z "$VERSION" ]; then echo "Could not read versionName"; exit 1; fi
+          echo "DocKube-Android v$VERSION (versionCode $CODE)" > release_body.txt
+          cat release_body.txt
+
       - name: Build Debug APK
         run: gradle assembleDebug
-        
+          
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
           name: Latest Android Build
+          body_path: release_body.txt
           files: DocKubeAndroid/app/build/outputs/apk/debug/*.apk
           draft: false
           prerelease: false
