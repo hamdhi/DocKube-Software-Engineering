@@ -134,7 +134,7 @@ class App(ctk.CTk):
             "MySQL", "Postgres", "MongoDB", "CI/CD & GitHub Actions",
             "GitHub", "Jenkins", "Terraform", "Ansible", "Port Manager",
             "Custom", "Networking Masterclass", "Security Testing",
-            "Firewalls", "Diagrams", "Databases"
+            "Firewalls", "Diagrams", "Databases", "Windows Diagnostics"
         ]
         ctk.CTkLabel(self.sidebar, text="DocKube",
                      font=ctk.CTkFont(size=20, weight="bold")).grid(
@@ -431,6 +431,8 @@ class App(ctk.CTk):
             devops_tools.add_security_testing_tools(self)
         elif cat == "Firewalls":
             devops_tools.add_firewall_tools(self)
+        elif cat == "Windows Diagnostics":
+            devops_tools.add_windows_diag_tools(self)
         elif cat == "Diagrams":
             devops_tools.add_diagram_tools(self)
         elif cat == "Databases":
@@ -747,9 +749,13 @@ class App(ctk.CTk):
                 if release.is_bundle:
                     # The asset is a zip of the whole application folder, so
                     # unpack it before the swap. DocKube.exe usually sits one
-                    # level down inside it, which is unwrapped here.
+                    # level down inside it, which is unwrapped here. The
+                    # RETURN VALUE is the extracted folder and it is what the
+                    # installer must be handed: passing the zip path itself
+                    # made robocopy retry against a file for two minutes and
+                    # the update never applied.
                     self.after(0, progress["set"], release.asset_size, release.asset_size)
-                    app_update.unpack_bundle(staged)
+                    staged = app_update.unpack_bundle(staged)
             except Exception as exc:
                 self.after(0, self._download_failed, progress, exc)
                 return

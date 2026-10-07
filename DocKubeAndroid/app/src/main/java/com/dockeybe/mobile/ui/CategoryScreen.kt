@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
@@ -46,12 +47,15 @@ fun CategoryScreen(
     onScrollIndexChanged: (Int) -> Unit,
     savedScrollIndex: Int,
 ) {
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(savedScrollIndex) {
-        if (savedScrollIndex >= 0) {
-            listState.scrollToItem(savedScrollIndex)
-        }
+    // Seeding the state with the saved index restores the position the moment
+    // the list is created - no effect, so no race with the first layout - and
+    // the collector keeps it current however the user leaves this screen.
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScrollIndex.coerceAtLeast(0),
+    )
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { onScrollIndexChanged(it) }
     }
 
     // "Custom" is a free-text box on the desktop and "Networking Masterclass"

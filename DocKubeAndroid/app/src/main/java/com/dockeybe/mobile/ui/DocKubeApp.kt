@@ -67,10 +67,12 @@ fun DocKubeApp(content: DocKubeContent) {
         UpdateDialog(onDismiss = { showUpdate = false })
     }
 
-    // Scroll positions for the chapter list and category pages are kept alive
-    // at the app level so they survive navigating away (to a chapter, or back
-    // to home) and re-entering. They are restored on entry and updated when the
-    // user taps an item to leave.
+    // Scroll positions for home, the chapter list and category pages are kept
+    // alive at the app level so they survive navigating away and re-entering.
+    // Each list seeds rememberLazyListState with its saved index (so restoring
+    // cannot race a LaunchedEffect) and collects firstVisibleItemIndex to keep
+    // the value current however the user leaves the screen.
+    var homeScrollIndex by rememberSaveable { mutableStateOf(-1) }
     var chapterListScrollIndex by rememberSaveable { mutableStateOf(-1) }
     var categoryScrollIndex by rememberSaveable { mutableStateOf(-1) }
 
@@ -151,6 +153,8 @@ Scaffold(
                     onLearning = { screen = Screen.ChapterList },
                     onSearch = { screen = Screen.Search },
                     onUpdate = { showUpdate = true },
+                    onScrollIndexChanged = { homeScrollIndex = it },
+                    savedScrollIndex = homeScrollIndex,
                 )
 
                 is Screen.Category -> {
@@ -171,7 +175,6 @@ Scaffold(
                     onOpen = { screen = Screen.Chapter(it) },
                     onScrollIndexChanged = { chapterListScrollIndex = it },
                     savedScrollIndex = chapterListScrollIndex,
-                    key = content,
                 )
 
                 is Screen.Chapter -> {

@@ -212,6 +212,13 @@ def add_firewall_tools(app):
     app.add_custom_input()
 
 
+def add_windows_diag_tools(app):
+    """Windows diagnosis panel: the legacy wmic/ipconfig/netstat toolkit."""
+    add_command_groups(app, specs.WINDOWS_DIAG_GROUPS,
+                       specs.ARG_PLACEHOLDERS["windows"])
+    app.add_custom_input()
+
+
 def add_diagram_tools(app):
     """Diagram tooling panel: PlantUML, Graphviz, Mermaid and schema export."""
     add_command_groups(app, specs.DIAGRAM_GROUPS, specs.ARG_PLACEHOLDERS["diagram"])

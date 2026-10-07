@@ -30,7 +30,7 @@ import zipfile
 
 # Single source of truth for the desktop version. The publish workflow greps
 # this line out of the file to stamp the release body, so keep the format.
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 
 RELEASE_URL = ("https://api.github.com/repos/hamdhi/DocKube-Software-Engineering"
                "/releases/tags/desktop-latest")
@@ -360,6 +360,15 @@ def _installer_script(staged, target, log_path, is_bundle=False):
     time: the files were actually replaced but the log claimed failure and
     the app was never restarted. That is why updates "downloaded but did
     nothing".
+
+    Two more traps are defused here:
+    * The staged path is verified BEFORE the retry loop. Handing the script
+      a zip instead of the extracted folder used to make robocopy fail the
+      same way sixty times over two minutes with a console window sitting
+      on screen the whole time.
+    * The success path ends with ``goto :cleanup``. Without it, execution
+      fell straight out of ``:swapped`` into ``:failed`` and wrote the
+      failure log even though the update had worked.
     """
     if is_bundle:
         launch = os.path.join(target, "DocKube.exe")
@@ -373,7 +382,17 @@ def _installer_script(staged, target, log_path, is_bundle=False):
             'copy /Y "%STAGED%" "%TARGET%" >NUL 2>&1',
             'if not errorlevel 1 goto :swapped',
         ]
+    cleanup = ('rmdir /S /Q "%STAGED%" >NUL 2>&1' if is_bundle
+               else 'del /F /Q "%STAGED%" >NUL 2>&1')
     retry_block = [
+        "rem The staged update must exist before the retries start, otherwise",
+        "rem a bad hand-off burns two minutes failing the same way sixty times.",
+        'if exist "%SOURCE%\\." goto :staged_ok',
+        'if exist "%SOURCE%" goto :staged_ok',
+        'echo The staged update is missing: %SOURCE% > "%LOG%"',
+        "goto :cleanup",
+        "",
+        ":staged_ok",
         "rem Wait for the old process to release its lock on the target.",
         "for /L %%i in (1,1,60) do (",
     ] + [f"    {line}" for line in swap] + [
@@ -382,9 +401,10 @@ def _installer_script(staged, target, log_path, is_bundle=False):
         "goto :failed",
         "",
         ":swapped",
-        'rmdir /S /Q "%STAGED%" >NUL 2>&1',
+        cleanup,
         'del "%LOG%" >NUL 2>&1',
         'start "" "%LAUNCH%"',
+        "goto :cleanup",
         "",
         ":failed",
         "rem The old files are still intact, so the app was not damaged.",

@@ -547,6 +547,33 @@ Important notes:
 - Deleting a StatefulSet leaves the PVCs behind by design
 - Parameterise every query; never interpolate input into raw SQL"""
 
+WINDOWS_DIAG_DOC = """Windows Diagnostics
+
+The classic toolkit for working out why a Windows machine is misbehaving.
+Every command here runs in the shared prompt below; the ones that need an
+argument take it from the box above the buttons.
+
+Key concepts:
+- systeminfo and msinfo32 are the one-shot summary when you know nothing yet
+- wmic is the legacy query language; PowerShell cmdlets are its replacement
+- ipconfig /all plus ping of the gateway isolates network faults in two steps
+- netstat -ano ties a listening port to the PID owning it
+- wevtutil reads event logs from the command line; eventvwr does it graphically
+- sfc repairs system files, DISM repairs the image sfc repairs from
+
+Common commands:
+    systeminfo | findstr /C:\"Boot Time\"
+    ipconfig /all
+    netstat -ano | findstr LISTENING
+    wevtutil qe System /c:20 /rd:true /f:text
+    sfc /scannow
+    DISM /Online /Cleanup-Image /RestoreHealth
+
+Important notes:
+- Run sfc, DISM and chkdsk from an elevated prompt or they refuse to work
+- chkdsk /f on C: schedules the scan for the next reboot
+- The Diagnostics chapter walks the triage order these commands fit into"""
+
 EXTRA_DOCS = {
     "Docker": DOCKER_DOC,
     "MySQL": MYSQL_DOC,
@@ -560,4 +587,5 @@ EXTRA_DOCS = {
     "Port Manager": PORT_MANAGER_DOC,
     "Security Testing": SECURITY_DOC,
     "Databases": DATABASES_DOC,
+    "Windows Diagnostics": WINDOWS_DIAG_DOC,
 }

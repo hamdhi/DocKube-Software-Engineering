@@ -25,7 +25,8 @@
   "Security Testing",
   "Firewalls",
   "Diagrams",
-  "Databases"
+  "Databases",
+  "Windows Diagnostics"
  ],
  "commands": {
   "Dashboard": {
@@ -2842,11 +2843,394 @@
     }
    ],
    "commands": []
+  },
+  "Windows Diagnostics": {
+   "groups": [
+    {
+     "title": "System Information",
+     "items": [
+      {
+       "label": "System Summary",
+       "command": "systeminfo"
+      },
+      {
+       "label": "Quick OS Summary",
+       "command": "systeminfo | findstr /C:\"OS Name\" /C:\"Boot Time\" /C:\"Total Physical Memory\""
+      },
+      {
+       "label": "System Info GUI",
+       "command": "msinfo32"
+      },
+      {
+       "label": "Windows Version",
+       "command": "winver"
+      },
+      {
+       "label": "Last Boot Time",
+       "command": "wmic os get lastbootuptime /value"
+      },
+      {
+       "label": "CPU Model",
+       "command": "wmic cpu get name"
+      },
+      {
+       "label": "BIOS Version",
+       "command": "wmic bios get smbiosbiosversion"
+      },
+      {
+       "label": "Machine Model",
+       "command": "wmic csproduct get name,identifyingnumber"
+      }
+     ]
+    },
+    {
+     "title": "Memory Diagnostics",
+     "items": [
+      {
+       "label": "Memory Sticks",
+       "command": "wmic memorychip get devicelocator,capacity,speed,status"
+      },
+      {
+       "label": "Memory Modules Full",
+       "command": "wmic memorychip list full"
+      },
+      {
+       "label": "Free and Total RAM",
+       "command": "wmic os get FreePhysicalMemory,TotalVisibleMemorySize /value"
+      },
+      {
+       "label": "Memory Test (reboots)",
+       "command": "mdsched.exe"
+      },
+      {
+       "label": "Resource Monitor",
+       "command": "resmon"
+      }
+     ]
+    },
+    {
+     "title": "Disk and Storage",
+     "items": [
+      {
+       "label": "Logical Disks",
+       "command": "wmic logicaldisk get caption,freespace,size,volumename"
+      },
+      {
+       "label": "Physical Disks",
+       "command": "wmic diskdrive get model,status,size"
+      },
+      {
+       "label": "Disk Health",
+       "command": "wmic diskdrive get status"
+      },
+      {
+       "label": "Volume Free Space",
+       "command": "fsutil volume diskfree c:"
+      },
+      {
+       "label": "Check Disk (read-only)",
+       "command": "chkdsk {arg}"
+      },
+      {
+       "label": "Check Disk (repair)",
+       "command": "chkdsk {arg} /f"
+      },
+      {
+       "label": "Defragment Analysis",
+       "command": "defrag {arg} /A /U /V"
+      },
+      {
+       "label": "Physical Disk List",
+       "command": "diskpart list disk"
+      }
+     ]
+    },
+    {
+     "title": "Network Diagnostics",
+     "items": [
+      {
+       "label": "Full IP Config",
+       "command": "ipconfig /all"
+      },
+      {
+       "label": "Flush DNS Cache",
+       "command": "ipconfig /flushdns"
+      },
+      {
+       "label": "Show DNS Cache",
+       "command": "ipconfig /displaydns"
+      },
+      {
+       "label": "Release DHCP",
+       "command": "ipconfig /release"
+      },
+      {
+       "label": "Renew DHCP",
+       "command": "ipconfig /renew"
+      },
+      {
+       "label": "Ping (continuous)",
+       "command": "ping -t {arg}"
+      },
+      {
+       "label": "Ping 4 Packets",
+       "command": "ping -n 4 {arg}"
+      },
+      {
+       "label": "Trace Route",
+       "command": "tracert -d {arg}"
+      },
+      {
+       "label": "Path Ping (latency)",
+       "command": "pathping {arg}"
+      },
+      {
+       "label": "ARP Table",
+       "command": "arp -a"
+      },
+      {
+       "label": "Routing Table",
+       "command": "route print"
+      },
+      {
+       "label": "NetBIOS Names",
+       "command": "nbtstat -n"
+      },
+      {
+       "label": "Remote NetBIOS",
+       "command": "nbtstat -A {arg}"
+      },
+      {
+       "label": "MAC Addresses",
+       "command": "getmac /all"
+      },
+      {
+       "label": "DNS Lookup",
+       "command": "nslookup {arg}"
+      },
+      {
+       "label": "Active Connections",
+       "command": "netstat -ano"
+      },
+      {
+       "label": "Listening Ports",
+       "command": "netstat -ano | findstr LISTENING"
+      },
+      {
+       "label": "Connection Statistics",
+       "command": "netstat -s"
+      },
+      {
+       "label": "Remote Shares",
+       "command": "net view"
+      },
+      {
+       "label": "Network Adapters",
+       "command": "wmic nic get name,speed"
+      }
+     ]
+    },
+    {
+     "title": "Wireless (netsh)",
+     "items": [
+      {
+       "label": "Current Connection",
+       "command": "netsh wlan show interfaces"
+      },
+      {
+       "label": "Visible Networks",
+       "command": "netsh wlan show networks mode=bssid"
+      },
+      {
+       "label": "Driver Info",
+       "command": "netsh wlan show drivers"
+      },
+      {
+       "label": "Security Mode",
+       "command": "netsh wlan show security"
+      },
+      {
+       "label": "Saved Profiles",
+       "command": "netsh wlan show profile"
+      }
+     ]
+    },
+    {
+     "title": "Processes and Services",
+     "items": [
+      {
+       "label": "Process List",
+       "command": "tasklist"
+      },
+      {
+       "label": "Processes With Services",
+       "command": "tasklist /svc"
+      },
+      {
+       "label": "Process Modules",
+       "command": "tasklist /m"
+      },
+      {
+       "label": "Kill By Image Name",
+       "command": "taskkill /F /IM {arg}"
+      },
+      {
+       "label": "Kill By PID",
+       "command": "taskkill /F /PID {arg}"
+      },
+      {
+       "label": "Service Details",
+       "command": "sc query {arg}"
+      },
+      {
+       "label": "Service Config",
+       "command": "sc qc {arg}"
+      },
+      {
+       "label": "All Service States",
+       "command": "sc queryex type=service state=all"
+      },
+      {
+       "label": "Start Service",
+       "command": "net start {arg}"
+      },
+      {
+       "label": "Stop Service",
+       "command": "net stop {arg}"
+      },
+      {
+       "label": "Services Console",
+       "command": "services.msc"
+      }
+     ]
+    },
+    {
+     "title": "Event Logs and Reliability",
+     "items": [
+      {
+       "label": "Event Viewer",
+       "command": "eventvwr"
+      },
+      {
+       "label": "List Event Logs",
+       "command": "wevtutil el"
+      },
+      {
+       "label": "Query System Log",
+       "command": "wevtutil qe System /c:20 /rd:true /f:text"
+      },
+      {
+       "label": "Query Application Log",
+       "command": "wevtutil qe Application /c:20 /rd:true /f:text"
+      },
+      {
+       "label": "Query Crash Entries",
+       "command": "wevtutil qe Application /c:10 /rd:true /f:text /q:*[System[(Level=1 or Level=2)]]"
+      },
+      {
+       "label": "Reliability Monitor",
+       "command": "perfmon /rel"
+      },
+      {
+       "label": "Performance Monitor",
+       "command": "perfmon"
+      },
+      {
+       "label": "DirectX Diagnostics",
+       "command": "dxdiag"
+      }
+     ]
+    },
+    {
+     "title": "System Repair",
+     "items": [
+      {
+       "label": "System File Checker",
+       "command": "sfc /scannow"
+      },
+      {
+       "label": "DISM Health Check",
+       "command": "DISM /Online /Cleanup-Image /CheckHealth"
+      },
+      {
+       "label": "DISM Restore Health",
+       "command": "DISM /Online /Cleanup-Image /RestoreHealth"
+      },
+      {
+       "label": "DISM Component Cleanup",
+       "command": "DISM /Online /Cleanup-Image /StartComponentCleanup"
+      },
+      {
+       "label": "Check Disk (repair C:)",
+       "command": "chkdsk C: /f /r"
+      }
+     ]
+    },
+    {
+     "title": "Boot and Startup",
+     "items": [
+      {
+       "label": "Boot Configuration",
+       "command": "bcdedit /enum"
+      },
+      {
+       "label": "Default Boot Entry",
+       "command": "bcdedit /enum {current}"
+      },
+      {
+       "label": "Safe Mode Entry",
+       "command": "bcdedit /enum {safeboot}"
+      },
+      {
+       "label": "System Configuration",
+       "command": "msconfig"
+      },
+      {
+       "label": "Refresh Group Policy",
+       "command": "gpupdate /force"
+      },
+      {
+       "label": "Resultant Group Policy",
+       "command": "gpresult /r"
+      }
+     ]
+    },
+    {
+     "title": "Hardware and Devices",
+     "items": [
+      {
+       "label": "Device Manager",
+       "command": "devmgmt.msc"
+      },
+      {
+       "label": "Disk Management",
+       "command": "diskmgmt.msc"
+      },
+      {
+       "label": "Computer Management",
+       "command": "compmgmt.msc"
+      },
+      {
+       "label": "Connected Devices",
+       "command": "wmic path win32_pnpentity get name,status"
+      },
+      {
+       "label": "Display Adapter",
+       "command": "wmic path win32_videocontroller get name,driverversion"
+      },
+      {
+       "label": "Attached Printers",
+       "command": "wmic printer list brief"
+      }
+     ]
+    }
+   ],
+   "commands": []
   }
  },
  "docs": {
   "Dashboard": "",
-  "Docker": "Docker packages applications into lightweight containers.\nKey concepts:\n- Image: read‑only template containing filesystem layers.\n- Container: a running instance of an image.\nCommon commands:\n    docker ps            – list running containers\n    docker ps -a        – list all containers\n    docker images       – list local images\n    docker run IMAGE    – start a new container from IMAGE\n    docker exec -it CONTAINER /bin/bash – open an interactive shell inside a running container.",
+  "Docker": "Docker - the Complete CLI\n\nDocker packages applications into lightweight containers. An image is a\nread-only template of filesystem layers; a container is a running instance\nof an image. This panel covers the whole CLI the way it is actually used.\n\nKey concepts:\n- Image is read-only, container adds a writable layer on top\n- Build with docker build, run with docker run, clean with prune\n- Bind mounts share host folders, named volumes persist data\n- Networks isolate containers; user-defined networks give DNS names\n\nCommon commands:\n    docker version\n    docker info\n    docker system df\n    docker run -d --name web -p 8080:80 nginx:alpine\n    docker ps -a\n    docker logs -f web\n    docker exec -it web sh\n    docker build -t app:dev .\n    docker build -t app:dev . && docker image prune -f\n    docker compose up -d --build\n    docker system prune\n\nStarter files:\n- Write Dockerfile for a multi-stage, non-root Python image\n- Write docker-compose.yml for a web plus Postgres stack\n- Write .dockerignore to keep the build context small\n\nImportant notes:\n- Read docker system df before any prune\n- docker volume prune DELETES DATA - confirm the volume first\n- Never use latest in production; pin the tag",
   "Minikube/Kind": "Minikube and Kind provide local Kubernetes clusters for development.\n- Minikube uses a VM or Docker driver to run a single‑node K8s cluster.\n- Kind runs Kubernetes inside Docker containers (great for CI).\nTypical commands:\n    minikube start      – start the cluster\n    kind create cluster – spin up a cluster with default config.",
   "Pods": "Pods are the smallest deployable unit in Kubernetes. They encapsulate one or more containers that share the same network namespace and storage volumes.\nImportant fields in a pod YAML:\n- `metadata.name`: unique pod name.\n- `spec.containers`: list of container specs (image, ports, env).\n- `spec.restartPolicy`: `Always`, `OnFailure`, or `Never`.",
   "Deployments": "Deployments manage stateless workloads, ensuring a desired number of pod replicas. They provide declarative updates and roll‑backs.\nKey YAML fields:\n- `spec.replicas`: number of desired pod replicas.\n- `spec.selector.matchLabels`: label selector matching the pods.\n- `spec.template`: pod template used for new pods.\n- `spec.strategy.type`: `RollingUpdate` (default) or `Recreate`.",
@@ -2864,11 +3248,12 @@
   "Ansible": "Ansible\n\nAnsible is agentless configuration management. It connects over SSH, reads an\ninventory of hosts, and applies playbooks that describe the desired state of\nthose machines. No agent to install, no daemon to maintain.\n\nKey concepts:\n- inventory lists the hosts and groups you manage\n- playbook is a YAML file of plays, each with tasks and handlers\n- module is the unit of work: copy, apt, service, template, lineinfile\n- --check (or --dry-run) reports changes without applying them\n- --diff shows the exact before/after for file modules\n- handlers run once at the end of a play, triggered by notifications\n\nCommon commands:\n    ansible all -m ping\n    ansible webservers -m ping\n    ansible-playbook site.yml\n    ansible-playbook site.yml --check --diff\n    ansible-playbook site.yml --syntax-check\n    ansible-playbook site.yml --limit webservers\n    ansible-playbook site.yml --tags deploy\n    ansible all -m shell -a \"uptime\"\n    ansible all -m command -a \"df -h\"\n    ansible webservers -b -m apt -a \"nginx\"\n\nInventory and configuration:\n    ansible-inventory --graph\n    ansible-inventory --list\n    ansible-inventory --host web1\n    ansible -i production.ini all -m ping\n    ansible-config dump\n    ansible-config list\n    ansible --version\n\nVault and collections:\n    ansible-vault create secrets.yml\n    ansible-vault edit secrets.yml\n    ansible-vault decrypt secrets.yml\n    ansible-galaxy collection install community.general\n    ansible-galaxy role init myrole\n    ansible-doc -l\n    ansible-doc user.add\n\nImportant notes:\n- Keep inventory in source control but secrets in ansible-vault\n- Always run --syntax-check in CI before a real run\n- Use --check --diff in pull requests to preview infrastructure changes",
   "Port Manager": "Port Manager\n\nPort Manager lists every TCP and UDP port currently in use on this PC, maps\neach one to the owning process, and lets you terminate that process.\n\nKey concepts:\n- netstat -ano shows the connections plus the owning PID for each one\n- tasklist resolves those PIDs into readable process names\n- LISTENING means the process accepts inbound connections on that port\n- taskkill /F force-kills a process; /T also kills its children\n- PID 0 and PID 4 are kernel-owned and can never be terminated\n\nCommon ports you will recognise:\n- 135 RPC, 445 SMB, 3389 RDP, 53 DNS, 8080 Jenkins, 5432 Postgres\n- 3306 MySQL, 27017 MongoDB, 6379 Redis, 9090 many dashboards\n- 6443 Kubernetes API server, 3000 Grafana\n\nKey commands:\n    netstat -ano\n    netstat -ano | findstr LISTENING\n    netstat -ano | findstr :8080\n    netstat -ano -p TCP\n    tasklist /FI \"PID eq 1234\"\n    tasklist /FO CSV /NH\n    taskkill /PID 1234 /F\n    taskkill /PID 1234 /F /T\n    taskkill /IM node.exe /F\n\nHow to use it:\n1. Press Refresh to load the live table.\n2. Filter by protocol or search a port number to narrow the list.\n3. Select a row and press Kill Port.\n4. Confirm the dialog; the table refreshes automatically afterwards.\n\nImportant notes:\n- Killing a system service can trigger a reboot or lose unsaved work\n- The Kill button blocks PID 0, PID 4 and core Windows services\n- Admin rights are required to terminate protected processes",
   "Custom": "Enter any free‑form command you want to run – useful for resources not covered by the built‑in shortcuts, such as `ReplicationController` or custom `kubectl` plugins.",
-  "Networking Masterclass": "Open the Learning Centre for the full study guide.\n\n43 chapters covering networking fundamentals, IP addresses, subnetting, ports, TCP vs UDP, protocols, network devices, the Linux command line and permissions, software engineering, Linux and Windows sysadmin, and DevOps.\n\nEvery chapter explains the theory in plain English, shows the real commands, gives memory tricks, includes a Learning vs Production comparison, and ends with an exercise you can run on this machine.\n\nPress the button below to open it in its own window.",
-  "Security Testing": "Find and fix security problems before users find them for you.\n\nThe buttons are grouped by the kind of test, which is also the order tests usually run in:\n• Reconnaissance - map the target with nmap, nikto and whatweb\n• Application scanning - OWASP ZAP, nuclei and sqlmap against a running app\n• Static analysis (SAST) - read the source without running it (bandit, semgrep, gitleaks)\n• Dependency scanning (SCA) - find known CVEs in what you imported (pip-audit, npm audit, trivy)\n• Container and host - check images and Kubernetes configuration\n• CI/CD gates - the checks that should fail a build automatically\n\nOnly ever scan systems you own or have written permission to test.",
+  "Networking Masterclass": "Open the Learning Centre for the full study guide.\n\n43 chapters covering networking fundamentals, IP addresses, subnetting, ports, TCP vs UDP, protocols, network devices, the Linux command line and permissions, software engineering, Linux and Windows sysadmin, DevOps, Docker, testing, Python, AI and more.\n\nEvery chapter explains the theory in plain English, shows the real commands, gives memory tricks, includes a Learning vs Production comparison, and ends with an exercise you can run on this machine.\n\nPress the button below to open it in its own window.",
+  "Security Testing": "Security Testing\n\nSecurity testing finds the vulnerabilities before someone else does. Only\never scan systems you own or have written permission to test.\n\nKey concepts:\n- Recon maps the target: DNS, ports, services, technology\n- Scanning finds known vulnerabilities: Nikto, Nuclei, sqlmap\n- SAST reads the code: Bandit, Semgrep, Gitleaks for secrets\n- CI/CD gates fail the build when a check fails\n- OWASP Top 10 is the starting vocabulary\n\nCommon commands:\n    nmap -sV target\n    nikto -h http://target\n    nuclei -u http://target\n    sqlmap -u http://target/page?id=1 --batch\n    bandit -r src\n    semgrep --config auto\n    gitleaks detect\n    bandit -r src && semgrep --config auto && gitleaks detect\n\nImportant notes:\n- Unauthorised scanning is illegal in most jurisdictions\n- Gate the build: SAST plus secret scanning on every pull request\n- Start with the OWASP Top 10, then read the Security Testing chapter",
   "Firewalls": "A firewall is the rulebook that decides which network traffic is allowed in, allowed out, or dropped silently.\n\nThis panel covers the four you will actually meet:\n• ufw - the simple front end on Ubuntu\n• firewalld - the zone-based equivalent on RHEL, CentOS and Fedora\n• nftables - the modern kernel rule engine underneath both\n• Windows Defender Firewall - the same idea via netsh on Windows\n\nRead the rules before you change them. Enabling a firewall with the wrong rules can lock you out of your own machine over SSH, so always confirm port 22 (or 3389 for Windows) is allowed first.",
   "Diagrams": "A diagram is an explanation that fits on one screen. Drawing one finds the gaps in your thinking faster than talking does.\n\nThese buttons render and check diagrams rather than draw them by hand:\n• PlantUML - architecture, UML and sequence diagrams from text\n• Graphviz - graph layout, good for dependency and flow graphs\n• Mermaid - diagrams that live in Markdown documentation\n• dbdiagram.io - database schemas, and it can generate the SQL\n\nThe Diagrams chapter explains which diagram to reach for, what each one is for, and when in the project you should draw it.",
-  "Databases": "Designing and querying a database properly is most of what separates a working application from a fast one.\n\n• Postgres, MySQL and Mongo clients for day-to-day work\n• Schema design and normalisation - finding duplicate values, stray nulls and unused indexes\n• Relationships and cardinality - which tables point at which, and how many rows each may have\n• The Databases chapter covers normalisation from 1NF to BCNF, joins, indexes, and full SQL and NoSQL\n\nThe MySQL, Postgres and MongoDB categories deploy those engines on Kubernetes. This category administers a database you already have."
+  "Databases": "Database Administration\n\nDesigning and querying a database properly is most of what separates a\nworking application from a fast one. This panel administers a database you\nalready have a client for - distinct from the MySQL, Postgres and MongoDB\ncategories, which deploy each engine on Kubernetes.\n\nKey concepts:\n- psql is the Postgres client, mysql the MySQL client, mongosh the Mongo one\n- pg_dump and mysqldump take logical backups; restore with psql or mysql\n- EXPLAIN shows the query plan before the query hurts production\n- Indexes speed reads and slow writes; unused ones are pure cost\n\nCommon commands:\n    psql -U postgres -c '\\l'\n    mysql -u root -p -e 'SHOW DATABASES;'\n    mongosh --eval 'db.adminCommand({listDatabases:1})'\n    pg_dump -d mydb > dump.sql\n    mysqldump mydb > dump.sql\n\nImportant notes:\n- Back up with a dump before any destructive operation\n- Deleting a StatefulSet leaves the PVCs behind by design\n- Parameterise every query; never interpolate input into raw SQL",
+  "Windows Diagnostics": "Windows Diagnostics\n\nThe classic toolkit for working out why a Windows machine is misbehaving.\nEvery command here runs in the shared prompt below; the ones that need an\nargument take it from the box above the buttons.\n\nKey concepts:\n- systeminfo and msinfo32 are the one-shot summary when you know nothing yet\n- wmic is the legacy query language; PowerShell cmdlets are its replacement\n- ipconfig /all plus ping of the gateway isolates network faults in two steps\n- netstat -ano ties a listening port to the PID owning it\n- wevtutil reads event logs from the command line; eventvwr does it graphically\n- sfc repairs system files, DISM repairs the image sfc repairs from\n\nCommon commands:\n    systeminfo | findstr /C:\"Boot Time\"\n    ipconfig /all\n    netstat -ano | findstr LISTENING\n    wevtutil qe System /c:20 /rd:true /f:text\n    sfc /scannow\n    DISM /Online /Cleanup-Image /RestoreHealth\n\nImportant notes:\n- Run sfc, DISM and chkdsk from an elevated prompt or they refuse to work\n- chkdsk /f on C: schedules the scan for the next reboot\n- The Diagnostics chapter walks the triage order these commands fit into"
  },
  "chapters": [
   {

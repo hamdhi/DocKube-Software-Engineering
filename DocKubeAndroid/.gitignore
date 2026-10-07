@@ -5,3 +5,7 @@ local.properties
 
 # The phone APK is a build output, not source.
 *.apk
+# ...except the dist folder, which ships curated copies of those APKs.
+# Both apps reference it and build-mobile.yml keeps it in sync with the
+# android-latest release, so it has to stay trackable.
+!dist/*.apk

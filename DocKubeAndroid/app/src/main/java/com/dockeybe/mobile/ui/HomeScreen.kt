@@ -23,6 +23,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.dockeybe.mobile.data.CategoryContent
 import com.dockeybe.mobile.data.DocKubeContent
 
@@ -40,9 +43,23 @@ fun HomeScreen(
     onLearning: () -> Unit,
     onSearch: () -> Unit,
     onUpdate: () -> Unit,
+    savedScrollIndex: Int = -1,
+    onScrollIndexChanged: (Int) -> Unit = {},
 ) {
     val totalCommands = content.categories.sumOf { it.totalCommands }
+    // Seeding the state with the saved index restores the position the moment
+    // the list is created - no effect, so no race with the first layout - and
+    // the collector keeps it current so returning from a category (or the
+    // Learning Centre) never dumps the user back at the top of the list.
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScrollIndex.coerceAtLeast(0),
+    )
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { onScrollIndexChanged(it) }
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize().background(DocBackground),
         contentPadding = ScreenPadding,
         verticalArrangement = Arrangement.spacedBy(10.dp),

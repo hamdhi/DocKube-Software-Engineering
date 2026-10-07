@@ -317,6 +317,53 @@ check("/MIR" in bundle, "the bundle script must mirror, so stale files are remov
 check("copy /Y" not in bundle, "the bundle script must not copy a single file")
 check(r'"TARGET=C:\app\DocKube"' in bundle, "the target folder is missing")
 
+# ------------------------------------------- the two update-blocking regressions
+# 1. Success must not fall through into :failed. The :swapped block used to end
+#    at the relaunch with no goto, so execution walked straight into :failed
+#    and wrote "could not replace the running app" even when it had.
+for name, script in (("single", single), ("bundle", bundle)):
+    lines = [l for l in script.splitlines() if l.strip()]
+    start = next(i for i, l in enumerate(lines) if l.startswith("start "))
+    check(lines[start + 1] == "goto :cleanup",
+          f"{name}: the success path falls through past 'start' "
+          f"(next line is {lines[start + 1]!r}, want 'goto :cleanup')")
+    failed = lines.index(":failed")
+    check(start < failed, f"{name}: ':failed' appears before the success path")
+
+# 2. A missing staged path must fail fast. Handing the script something that
+#    is not there (historically: the zip instead of the extracted folder) used
+#    to burn sixty retries - two minutes of a console window on screen - before
+#    giving up. The timeout below is the assertion: without the pre-check this
+#    script runs for ~120 seconds and the test dies on the timeout.
+missing = app_update._installer_script(
+    r"C:\tmp\really_not_here", r"C:\app\DocKube",
+    os.path.join(tmp, "missing.log"), True)
+check('if exist "%SOURCE%' in missing,
+      "the script does not pre-check the staged path before retrying")
+missing = missing.replace('start "" "%LAUNCH%"', "rem launch stubbed")
+fast_path = os.path.join(tmp, "missing_staged.bat")
+with open(fast_path, "w", encoding="utf-8", newline="") as handle:
+    handle.write(missing)
+fast = subprocess.run(["cmd", "/c", fast_path], capture_output=True,
+                      text=True, timeout=60)
+check(os.path.isfile(os.path.join(tmp, "missing.log")),
+      "the fast-fail path did not write its log")
+check("staged update is missing" in open(os.path.join(tmp, "missing.log"),
+                                         encoding="utf-8", errors="replace").read(),
+      "the fast-fail log does not say what was missing")
+print("installer script: success path cleans up, missing staged fails fast")
+
+# ------------------------------------- app.py must pass the unpacked folder
+# unpack_bundle RETURNS the extracted folder; app.py once threw that away and
+# handed the installer the zip path itself, so robocopy retried against a file
+# and the update silently never applied. The contract lives in source, because
+# exercising it end to end would need a frozen executable.
+app_src = open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
+check("staged = app_update.unpack_bundle(staged)" in app_src,
+      "app.py discards unpack_bundle's return value, so the installer would be "
+      "handed the zip instead of the extracted folder and never update")
+print("app.py: unpack_bundle return value is handed to the installer")
+
 # -------------------------------------------------------------- unpack
 print("\nbundle unpack")
 check(hasattr(app_update, "unpack_bundle"), "unpack_bundle is missing")

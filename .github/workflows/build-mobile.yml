@@ -47,6 +47,14 @@ jobs:
       - name: Build Release APK
         run: gradle assembleRelease
 
+      - name: Copy the APK into the mobile dist folder
+        run: |
+          set -e
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/app-release.apk
+          echo "DocKubeAndroid/dist now holds:"
+          ls -l dist
+
       - name: Delete stale release assets
         run: |
           set -e
@@ -66,7 +74,9 @@ jobs:
 
       - name: Upload Release APK and stamp body
         env:
-          APK: app/build/outputs/apk/release/app-release.apk
+          # The file published is the one sitting in the mobile dist folder,
+          # so the release asset and DocKubeAndroid/dist are always identical.
+          APK: dist/app-release.apk
         run: |
           set -e
           apk_size=$(stat -c%s "$APK")
@@ -95,3 +105,21 @@ jobs:
             "https://uploads.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets?name=app-release.apk" \
             -o /dev/null
           echo "APK uploaded"
+
+      - name: Commit the dist folder back to the repository
+        # Never fail the release over a sync push: a rejected push (user
+        # pushed meanwhile, branch protection) leaves only the repo copy of
+        # dist stale while the published asset stays correct.
+        working-directory: ${{ github.workspace }}
+        continue-on-error: true
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add DocKubeAndroid/dist/app-release.apk
+          if git diff --cached --quiet; then
+            echo "dist/app-release.apk is already up to date"
+          else
+            git commit -m "Publish android-latest app-release.apk into DocKubeAndroid/dist [skip ci]"
+            git push
+          fi

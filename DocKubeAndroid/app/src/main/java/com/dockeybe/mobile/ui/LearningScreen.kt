@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,14 +40,16 @@ fun ChapterListScreen(
     onOpen: (String) -> Unit,
     onScrollIndexChanged: (Int) -> Unit,
     savedScrollIndex: Int,
-    key: Any = content,
 ) {
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(key, savedScrollIndex) {
-        if (savedScrollIndex >= 0) {
-            listState.scrollToItem(savedScrollIndex)
-        }
+    // Seeding the state with the saved index restores the position the moment
+    // the list is created - no effect, so no race with the first layout - and
+    // the collector keeps it current however the user leaves this screen.
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScrollIndex.coerceAtLeast(0),
+    )
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { onScrollIndexChanged(it) }
     }
 
     LazyColumn(

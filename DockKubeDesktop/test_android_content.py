@@ -40,7 +40,7 @@ print(f"categories: {len(categories)}")
 print(f"chapters  : {len(chapters)}")
 
 # --- structure -------------------------------------------------------------
-check(len(categories) == 24, f"expected 24 categories, got {len(categories)}")
+check(len(categories) == 25, f"expected 25 categories, got {len(categories)}")
 # The intro chapter plus one per entry in learning_index.CHAPTERS.
 import learning_index as _li
 _expected_chapters = 1 + len(_li.CHAPTERS)
