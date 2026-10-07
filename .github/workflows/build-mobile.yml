@@ -51,7 +51,7 @@ jobs:
           echo "release_id=$release_id"
           # Delete both the stale debug APK and any previous release APK:
           # the upload API returns 422 when an asset with the same name exists.
-          asset_ids=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "import sys,json; [print(a['id']) for a in json.load(sys.stdin)['assets'] if a['name'] in ('app-debug.apk','app-release.apk')]")
+          asset_ids=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "import sys,json; assets=json.load(sys.stdin); [print(a['id']) for a in assets if a['name'] in ('app-debug.apk','app-release.apk')]")
           for asset_id in $asset_ids; do
             echo "Deleting asset_id=$asset_id"
             curl -fsSL -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/assets/$asset_id"
