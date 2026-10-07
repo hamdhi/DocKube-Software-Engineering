@@ -44,6 +44,9 @@ jobs:
           echo "DocKube-Android v$VERSION (versionCode $CODE)" > release_body.txt
           cat release_body.txt
 
+      - name: Build Release APK
+        run: gradle assembleRelease
+
       - name: Delete stale release assets
         run: |
           set -e
@@ -51,6 +54,8 @@ jobs:
           echo "release_id=$release_id"
           # Delete both the stale debug APK and any previous release APK:
           # the upload API returns 422 when an asset with the same name exists.
+          # Runs after the build so a failed build never leaves the release
+          # with no downloadable APK.
           asset_ids=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "import sys,json; assets=json.load(sys.stdin); [print(a['id']) for a in assets if a['name'] in ('app-debug.apk','app-release.apk')]")
           for asset_id in $asset_ids; do
             echo "Deleting asset_id=$asset_id"
@@ -59,9 +64,6 @@ jobs:
           done
           echo "Stale assets cleaned"
 
-      - name: Build Release APK
-        run: gradle assembleRelease
-
       - name: Upload Release APK and stamp body
         env:
           APK: app/build/outputs/apk/release/app-release.apk
@@ -69,14 +71,19 @@ jobs:
           set -e
           apk_size=$(stat -c%s "$APK")
           echo "apk_size=$apk_size"
+          release_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest" | python -c "import sys,json;print(json.load(sys.stdin)['id'])")
+          echo "release_id=$release_id"
           # Update body (use a file to avoid shell mangling of the body)
+          # PATCH only exists on /releases/{id}; the /releases/tags/{tag}
+          # form is GET-only and returns 404 for PATCH.
           cat release_body.txt > publish_body.txt
           curl -fsSL -X PATCH \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: text/plain" \
             --data-binary @"publish_body.txt" \
-            "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest"
+            "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id" \
+            -o /dev/null
           echo "Body updated"
           # Upload APK
           curl -fsSL -X POST \
@@ -84,5 +91,6 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @"$APK" \
-            "https://uploads.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/403353510/assets?name=app-release.apk"
+            "https://uploads.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets?name=app-release.apk" \
+            -o /dev/null
           echo "APK uploaded"
