@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'DocKubeAndroid/**'
+      - '.github/workflows/build-mobile.yml'
   workflow_dispatch:
 
 jobs:
@@ -32,7 +33,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.13
+          gradle-version: 8.14.3
 
       - name: Stamp the release body
         run: |
@@ -43,31 +44,27 @@ jobs:
           echo "DocKube-Android v$VERSION (versionCode $CODE)" > release_body.txt
           cat release_body.txt
 
-      - name: Delete stale release asset
+      - name: Delete stale release assets
         run: |
           set -e
           release_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest" | python -c "import sys,json;print(json.load(sys.stdin)['id'])")
           echo "release_id=$release_id"
-          asset_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "
-import sys,json
-assets = json.load(sys.stdin)['assets']
-found = [a['id'] for a in assets if a['name']=='app-debug.apk']
-print(found[0] if found else '')
-")
-          echo "asset_id=$asset_id"
-          if [ -n "$asset_id" ]; then
+          # Delete both the stale debug APK and any previous release APK:
+          # the upload API returns 422 when an asset with the same name exists.
+          asset_ids=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "import sys,json; [print(a['id']) for a in json.load(sys.stdin)['assets'] if a['name'] in ('app-debug.apk','app-release.apk')]")
+          for asset_id in $asset_ids; do
+            echo "Deleting asset_id=$asset_id"
             curl -fsSL -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/assets/$asset_id"
-            echo "Deleted stale app-debug.apk asset"
-          else
-            echo "No stale app-debug.apk asset to delete"
-          fi
+            echo "Deleted asset $asset_id"
+          done
+          echo "Stale assets cleaned"
 
       - name: Build Release APK
         run: gradle assembleRelease
 
       - name: Upload Release APK and stamp body
         env:
-          APK: DocKubeAndroid/app/build/outputs/apk/release/app-release.apk
+          APK: app/build/outputs/apk/release/app-release.apk
         run: |
           set -e
           apk_size=$(stat -c%s "$APK")
