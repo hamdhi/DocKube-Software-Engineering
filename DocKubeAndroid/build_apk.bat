@@ -1,5 +1,7 @@
 @echo off
 REM Builds the DocKube Android APK.
+REM   The release APK is published to the 'android-latest' GitHub release,
+REM   not copied to the desktop app's dist folder.
 REM
 REM Everything is installed locally, so Android Studio is not needed:
 REM   C:\Android\Sdk     - platform android-36, build-tools 36.0.0
@@ -8,7 +10,8 @@ REM
 REM Usage:
 REM   build_apk.bat            debug APK
 REM   build_apk.bat release    release APK
-setlocal
+REM   (published to the android-latest GitHub release)
+REMsetlocal
 
 set "JAVA_HOME=C:\JDK 17"
 set "ANDROID_HOME=C:\Android\Sdk"
