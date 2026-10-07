@@ -42,8 +42,8 @@ jobs:
           echo "DocKube-Android v$VERSION (versionCode $CODE)" > release_body.txt
           cat release_body.txt
 
-      - name: Build Debug APK
-        run: gradle assembleDebug
+      - name: Build Release APK
+        run: gradle assembleRelease
           
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -51,7 +51,7 @@ jobs:
           tag_name: android-latest
           name: Latest Android Build
           body_path: release_body.txt
-          files: DocKubeAndroid/app/build/outputs/apk/debug/*.apk
+          files: DocKubeAndroid/app/build/outputs/apk/release/*.apk
           draft: false
           prerelease: false
         env:
