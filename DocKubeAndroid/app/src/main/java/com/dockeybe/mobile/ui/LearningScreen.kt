@@ -14,16 +14,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -37,20 +35,11 @@ import com.dockeybe.mobile.data.DocKubeContent
 @Composable
 fun ChapterListScreen(
     content: DocKubeContent,
+    listState: LazyListState,
     onOpen: (String) -> Unit,
-    onScrollIndexChanged: (Int) -> Unit,
-    savedScrollIndex: Int,
 ) {
-    // Seeding the state with the saved index restores the position the moment
-    // the list is created - no effect, so no race with the first layout - and
-    // the collector keeps it current however the user leaves this screen.
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = savedScrollIndex.coerceAtLeast(0),
-    )
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { onScrollIndexChanged(it) }
-    }
+    // listState is hoisted at the app level and survives opening a chapter, so
+    // going back restores the list exactly where it was.
 
     LazyColumn(
         state = listState,
@@ -68,10 +57,7 @@ fun ChapterListScreen(
         items(content.chapters, key = { it.title }) { chapter ->
             ChapterRow(
                 chapter = chapter,
-                onClick = {
-                    onScrollIndexChanged(listState.firstVisibleItemIndex)
-                    onOpen(chapter.title)
-                },
+                onClick = { onOpen(chapter.title) },
             )
         }
     }

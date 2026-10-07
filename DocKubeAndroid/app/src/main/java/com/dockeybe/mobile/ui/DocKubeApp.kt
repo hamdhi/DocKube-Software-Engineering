@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.lazy.LazyListState
 import com.dockeybe.mobile.data.DocKubeContent
 import kotlinx.coroutines.launch
 
@@ -67,14 +68,23 @@ fun DocKubeApp(content: DocKubeContent) {
         UpdateDialog(onDismiss = { showUpdate = false })
     }
 
-    // Scroll positions for home, the chapter list and category pages are kept
-    // alive at the app level so they survive navigating away and re-entering.
-    // Each list seeds rememberLazyListState with its saved index (so restoring
-    // cannot race a LaunchedEffect) and collects firstVisibleItemIndex to keep
-    // the value current however the user leaves the screen.
-    var homeScrollIndex by rememberSaveable { mutableStateOf(-1) }
-    var chapterListScrollIndex by rememberSaveable { mutableStateOf(-1) }
-    var categoryScrollIndex by rememberSaveable { mutableStateOf(-1) }
+    // Scroll state for home, the chapter list and category pages is hoisted here
+    // so it survives navigating away and re-entering. Hoisting the whole
+    // LazyListState (not just an index) is what makes back-navigation restore:
+    // seeding with initialFirstVisibleItemIndex inside each screen re-created
+    // the state on return, and the snapshotFlow collector wrote 0 over the
+    // saved index before the restore ran, dumping the user at the top.
+    // LazyListState.Saver keeps index + offset across recompositions, and per
+    // category key keeps each category's position separate.
+    val homeListState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
+    val chapterListState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
+    val categoryListStates = remember { mutableMapOf<String, LazyListState>() }
+    fun categoryState(name: String): LazyListState =
+        categoryListStates.getOrPut(name) { LazyListState() }
 
     // One definition of "go back", shared by the toolbar arrow and the system
     // back gesture. A chapter returns to the chapter list because that is
@@ -149,12 +159,11 @@ Scaffold(
             when (val s = screen) {
                 is Screen.Home -> HomeScreen(
                     content = content,
+                    listState = homeListState,
                     onCategory = { screen = Screen.Category(it) },
                     onLearning = { screen = Screen.ChapterList },
                     onSearch = { screen = Screen.Search },
                     onUpdate = { showUpdate = true },
-                    onScrollIndexChanged = { homeScrollIndex = it },
-                    savedScrollIndex = homeScrollIndex,
                 )
 
                 is Screen.Category -> {
@@ -162,19 +171,17 @@ Scaffold(
                     if (category == null) screen = Screen.Home
                     else CategoryScreen(
                         category = category,
+                        listState = categoryState(s.name),
                         onCopy = copyText,
                         onShare = shareText,
                         onLearning = { screen = Screen.ChapterList },
-                        onScrollIndexChanged = { categoryScrollIndex = it },
-                        savedScrollIndex = categoryScrollIndex,
                     )
                 }
 
                 is Screen.ChapterList -> ChapterListScreen(
                     content = content,
+                    listState = chapterListState,
                     onOpen = { screen = Screen.Chapter(it) },
-                    onScrollIndexChanged = { chapterListScrollIndex = it },
-                    savedScrollIndex = chapterListScrollIndex,
                 )
 
                 is Screen.Chapter -> {

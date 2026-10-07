@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,8 +24,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,32 +31,21 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.lazy.rememberLazyListState
 import com.dockeybe.mobile.data.CategoryContent
 import com.dockeybe.mobile.data.DocKubeContent
 
 @Composable
 fun HomeScreen(
     content: DocKubeContent,
+    listState: LazyListState,
     onCategory: (String) -> Unit,
     onLearning: () -> Unit,
     onSearch: () -> Unit,
     onUpdate: () -> Unit,
-    savedScrollIndex: Int = -1,
-    onScrollIndexChanged: (Int) -> Unit = {},
 ) {
     val totalCommands = content.categories.sumOf { it.totalCommands }
-    // Seeding the state with the saved index restores the position the moment
-    // the list is created - no effect, so no race with the first layout - and
-    // the collector keeps it current so returning from a category (or the
-    // Learning Centre) never dumps the user back at the top of the list.
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = savedScrollIndex.coerceAtLeast(0),
-    )
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { onScrollIndexChanged(it) }
-    }
+    // listState is hoisted at the app level and survives navigating away, so
+    // returning from a category (or the Learning Centre) restores position.
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().background(DocBackground),

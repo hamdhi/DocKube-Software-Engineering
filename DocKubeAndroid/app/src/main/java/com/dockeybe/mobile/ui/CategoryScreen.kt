@@ -24,10 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,31 +38,18 @@ import com.dockeybe.mobile.data.CommandRef
 @Composable
 fun CategoryScreen(
     category: CategoryContent,
+    listState: LazyListState,
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
     onLearning: () -> Unit,
-    onScrollIndexChanged: (Int) -> Unit,
-    savedScrollIndex: Int,
 ) {
-    // Seeding the state with the saved index restores the position the moment
-    // the list is created - no effect, so no race with the first layout - and
-    // the collector keeps it current however the user leaves this screen.
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = savedScrollIndex.coerceAtLeast(0),
-    )
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { onScrollIndexChanged(it) }
-    }
+    // listState is hoisted per category at the app level and survives
+    // navigating away, so going back restores the position.
 
     // "Custom" is a free-text box on the desktop and "Networking Masterclass"
     // is only a launcher, so neither has commands worth listing here.
     if (category.name == "Networking Masterclass") {
-        LearningLauncher(
-            onLearning = onLearning,
-            onScrollIndexChanged = onScrollIndexChanged,
-            listState = listState,
-        )
+        LearningLauncher(onLearning = onLearning)
         return
     }
     if (category.name == "Custom") {
@@ -196,8 +180,6 @@ fun NoteCard(title: String, body: String) {
 @Composable
 private fun LearningLauncher(
     onLearning: () -> Unit,
-    onScrollIndexChanged: (Int) -> Unit,
-    listState: LazyListState,
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         NoteCard(
@@ -211,10 +193,7 @@ private fun LearningLauncher(
         Card(
             colors = CardDefaults.cardColors(containerColor = DocAccent),
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth().clickable {
-                onScrollIndexChanged(listState.firstVisibleItemIndex)
-                onLearning()
-            },
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onLearning),
         ) {
             Row(
                 Modifier.padding(14.dp),

@@ -336,8 +336,14 @@ def unpack_bundle(archive_path):
 
 # The helper must outlive the app it is updating, so it is fully detached
 # rather than a child process that dies with its parent's console.
-_DETACHED = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-    subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+# CREATE_NO_WINDOW is essential: without it the helper opens a visible
+# console that sits on screen running the ping delay while it retries the
+# swap, which is the "terminal that says ping and updates nothing" the user
+# sees. Detached + new group + no window = invisible background swap.
+_DETACHED = (getattr(subprocess, "DETACHED_PROCESS", 0)
+             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+             | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+             | 0x08000000)
 
 
 def _installer_script(staged, target, log_path, is_bundle=False):
