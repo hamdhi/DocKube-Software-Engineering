@@ -1,65 +1,77 @@
-name: Build Kotlin Android App
-
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'DocKubeAndroid/**'
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ./DocKubeAndroid
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: temurin
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 8.13
-
-      - name: Stamp the release body
-        run: |
-          VERSION=$(grep -m1 '^ *versionName *= *"' app/build.gradle.kts | sed 's/.*\"\(.*\)\"/\1/')
-          CODE=$(grep -m1 '^ *versionCode *= *[0-9]*' app/build.gradle.kts | grep -o '[0-9]*')
-          if [ -z "$VERSION" ]; then echo "Could not read versionName"; exit 1; fi
-          echo "DocKube-Android v$VERSION (versionCode $CODE)" > release_body.txt
-          cat release_body.txt
-
-      - name: Remove stale debug APK from the release
-        run: |
-          gh release delete app-debug.apk -y --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME" 2>/dev/null || true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build Release APK
-        run: gradle assembleRelease
-
-      - name: Publish to GitHub Releases
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-latest
-          name: Latest Android Build
-          body_path: release_body.txt
-          files: DocKubeAndroid/app/build/outputs/apk/release/*.apk
-          remove_artifacts: true
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+name: Build Kotlin Android App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'DocKubeAndroid/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./DocKubeAndroid
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.13
+
+      - name: Stamp the release body
+        run: |
+          VERSION=$(grep -m1 '^ *versionName *= *"' app/build.gradle.kts | sed 's/.*"\(.*\)"/\1/')
+          CODE=$(grep -m1 '^ *versionCode *= *[0-9]*' app/build.gradle.kts | grep -o '[0-9]*')
+          if [ -z "$VERSION" ]; then echo "Could not read versionName"; exit 1; fi
+          echo "DocKube-Android v$VERSION (versionCode $CODE)" > release_body.txt
+          cat release_body.txt
+
+      - name: Delete stale release asset
+        run: |
+          release_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest" | python -c "import sys,json;print(json.load(sys.stdin)['id'])")
+          asset_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "import sys,json;print([a['id'] for a in json.load(sys.stdin)['assets'] if a['name']=='app-debug.apk'][0] if any(a['name']=='app-debug.apk' for a in json.load(sys.stdin)['assets']) else '')")
+          if [ -n "$asset_id" ]; then
+            curl -fsSL -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/assets/$asset_id"
+            echo "Deleted stale app-debug.apk asset"
+          fi
+
+      - name: Build Release APK
+        run: gradle assembleRelease
+
+      - name: Upload Release APK and stamp body
+        env:
+          APK: DocKubeAndroid/app/build/outputs/apk/release/app-release.apk
+        run: |
+          apk_size=$(stat -c%s "$APK")
+          BODY=$(cat release_body.txt)
+          echo "Publishing body: $BODY"
+          # Update body
+          curl -fsSL -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: text/plain" \
+            -d "$BODY" \
+            "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest" && echo "Body updated"
+          # Upload APK
+          curl -fsSL -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$APK" \
+            "https://uploads.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/403353510/assets?name=app-release.apk" && echo "APK uploaded"
