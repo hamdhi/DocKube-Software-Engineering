@@ -30,7 +30,7 @@ import zipfile
 
 # Single source of truth for the desktop version. The publish workflow greps
 # this line out of the file to stamp the release body, so keep the format.
-APP_VERSION = "1.4.1"
+APP_VERSION = "1.4.2"
 
 RELEASE_URL = ("https://api.github.com/repos/hamdhi/DocKube-Software-Engineering"
                "/releases/tags/desktop-latest")
@@ -47,8 +47,12 @@ _VERSION_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 # The published asset has been called both dockube.exe and DocKube.exe over
 # time, and the application is now a folder rather than a single file, so the
-# download name is a preference rather than a formality.
-_PREFERRED_ASSETS = ("dockeybe.exe", "dockube.exe", "dockeybe.zip", "dockube.zip")
+# download name is a preference rather than a formality. Current builds publish
+# DocKubeSetup.exe (the installer) and dockeybe.zip (the folder the in-app
+# updater swaps in), so those come first.
+_PREFERRED_ASSETS = ("dockeybe.zip", "dockube.zip",
+                     "DocKubeSetup.exe", "dockeybe.exe",
+                     "dockube.exe", "DocKube.exe")
 
 _CHUNK = 64 * 1024
 
@@ -400,9 +404,10 @@ def _installer_script(staged, target, log_path, is_bundle=False):
         "",
         ":staged_ok",
         "rem Wait for the old process to release its lock on the target.",
+        "rem timeout (not ping) so no stray terminal output ever appears.",
         "for /L %%i in (1,1,60) do (",
     ] + [f"    {line}" for line in swap] + [
-        "    ping -n 2 127.0.0.1 >NUL",
+        "    timeout /t 1 /nobreak >NUL",
         ")",
         "goto :failed",
         "",
@@ -452,9 +457,12 @@ def install_downloaded(staged, target, log_path=None, is_bundle=False):
     script_path = os.path.join(script_dir, "apply_update.bat")
     with open(script_path, "w", encoding="utf-8") as handle:
         handle.write(_installer_script(staged, target, log_path, is_bundle))
+    # close_fds must stay False on Windows: True forces the child onto the
+    # parent's console (or a new visible one), which overrides CREATE_NO_WINDOW
+    # and is exactly the "terminal that says ping" from the screenshot.
     subprocess.Popen(
         ["cmd", "/c", script_path],
         creationflags=_DETACHED,
-        close_fds=True,
+        close_fds=False,
     )
     return script_path

@@ -10,7 +10,7 @@
 ; writable, needs no administrator, and still appears in Start menu search.
 
 #define AppName "DocKube"
-#define AppVersion "1.4.1"
+#define AppVersion "1.4.2"
 #define AppPublisher "DocKube"
 #define AppExeName "DocKube.exe"
 #define SourceDir "dist\DocKube"

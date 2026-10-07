@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -82,7 +83,33 @@ fun DocKubeApp(content: DocKubeContent) {
     val chapterListState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
-    val categoryListStates = remember { mutableMapOf<String, LazyListState>() }
+    // One LazyListState per category, saved across recompositions AND process
+    // death. A plain remember map was wiped whenever the app state changed,
+    // which dumped the user back at the top of the category list.
+    val categoryListStates = rememberSaveable(
+        saver = listSaver(
+            save = { states ->
+                states.entries.map { (name, state) ->
+                    "${name.length}:$name:${state.firstVisibleItemIndex}:${state.firstVisibleItemScrollOffset}"
+                }
+            },
+            restore = { saved ->
+                saved.mapNotNull { entry ->
+                    val firstColon = entry.indexOf(':')
+                    if (firstColon < 0) return@mapNotNull null
+                    val nameLen = entry.substring(0, firstColon).toIntOrNull()
+                        ?: return@mapNotNull null
+                    val nameStart = firstColon + 1
+                    val name = entry.substring(nameStart, nameStart + nameLen)
+                    val rest = entry.substring(nameStart + nameLen + 1)
+                    val parts = rest.split(':')
+                    val index = parts.getOrNull(0)?.toIntOrNull() ?: 0
+                    val offset = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                    name to LazyListState(index, offset)
+                }.toMap().toMutableMap()
+            },
+        )
+    ) { mutableMapOf<String, LazyListState>() }
     fun categoryState(name: String): LazyListState =
         categoryListStates.getOrPut(name) { LazyListState() }
 
