@@ -730,17 +730,21 @@ class App(ctk.CTk):
         self.update_btn.configure(state="disabled", text="Downloading...")
         self.set_status(f"Downloading {release.asset_name}...")
         progress = self._download_dialog(release)
-        # A bundle is staged outside the install folder, because the folder is
-        # what the update replaces and writing the download into it would make
-        # the mirror copy a file onto itself.
-        if release.is_bundle:
-            staged = os.path.join(
-                tempfile.gettempdir(), f"dockeybe_update_{os.getpid()}")
-        else:
-            staged = os.path.join(
-                os.path.dirname(target), f"{release.asset_name}.new")
 
         def task():
+            # Determine the staging location up front so it is always bound
+            # before use. If `staged` were assigned only inside conditional
+            # branches, Python would treat it as local to this function and the
+            # first call to app_update.download() would read an unbound variable.
+            if release.is_bundle:
+                # A bundle is staged outside the install folder, because the
+                # folder is what the update replaces and writing the download
+                # into it would make the mirror copy a file onto itself.
+                staged = os.path.join(
+                    tempfile.gettempdir(), f"dockeybe_update_{os.getpid()}")
+            else:
+                staged = os.path.join(
+                    os.path.dirname(target), f"{release.asset_name}.new")
             try:
                 app_update.download(
                     release, staged,
