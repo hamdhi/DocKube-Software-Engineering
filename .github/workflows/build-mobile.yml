@@ -73,15 +73,16 @@ jobs:
           echo "apk_size=$apk_size"
           release_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest" | python -c "import sys,json;print(json.load(sys.stdin)['id'])")
           echo "release_id=$release_id"
-          # Update body (use a file to avoid shell mangling of the body)
+          # Update body (use a file to avoid shell mangling of the body).
           # PATCH only exists on /releases/{id}; the /releases/tags/{tag}
-          # form is GET-only and returns 404 for PATCH.
-          cat release_body.txt > publish_body.txt
+          # form is GET-only and returns 404 for PATCH. The API also
+          # requires a JSON payload -- raw text/plain is rejected with 400.
+          python -c "import json; open('publish_body.json','w',encoding='utf-8').write(json.dumps({'body': open('release_body.txt',encoding='utf-8').read()}))"
           curl -fsSL -X PATCH \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: text/plain" \
-            --data-binary @"publish_body.txt" \
+            -H "Content-Type: application/json" \
+            --data-binary @"publish_body.json" \
             "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id" \
             -o /dev/null
           echo "Body updated"
