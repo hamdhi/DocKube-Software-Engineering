@@ -36,6 +36,7 @@ jobs:
 
       - name: Stamp the release body
         run: |
+          set -e
           VERSION=$(grep -m1 '^ *versionName *= *"' app/build.gradle.kts | sed 's/.*"\(.*\)"/\1/')
           CODE=$(grep -m1 '^ *versionCode *= *[0-9]*' app/build.gradle.kts | grep -o '[0-9]*')
           if [ -z "$VERSION" ]; then echo "Could not read versionName"; exit 1; fi
@@ -44,11 +45,21 @@ jobs:
 
       - name: Delete stale release asset
         run: |
+          set -e
           release_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest" | python -c "import sys,json;print(json.load(sys.stdin)['id'])")
-          asset_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "import sys,json;print([a['id'] for a in json.load(sys.stdin)['assets'] if a['name']=='app-debug.apk'][0] if any(a['name']=='app-debug.apk' for a in json.load(sys.stdin)['assets']) else '')")
+          echo "release_id=$release_id"
+          asset_id=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/$release_id/assets" | python -c "
+import sys,json
+assets = json.load(sys.stdin)['assets']
+found = [a['id'] for a in assets if a['name']=='app-debug.apk']
+print(found[0] if found else '')
+")
+          echo "asset_id=$asset_id"
           if [ -n "$asset_id" ]; then
             curl -fsSL -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/assets/$asset_id"
             echo "Deleted stale app-debug.apk asset"
+          else
+            echo "No stale app-debug.apk asset to delete"
           fi
 
       - name: Build Release APK
@@ -58,20 +69,23 @@ jobs:
         env:
           APK: DocKubeAndroid/app/build/outputs/apk/release/app-release.apk
         run: |
+          set -e
           apk_size=$(stat -c%s "$APK")
-          BODY=$(cat release_body.txt)
-          echo "Publishing body: $BODY"
-          # Update body
+          echo "apk_size=$apk_size"
+          # Update body (use a file to avoid shell mangling of the body)
+          cat release_body.txt > publish_body.txt
           curl -fsSL -X PATCH \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: text/plain" \
-            -d "$BODY" \
-            "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest" && echo "Body updated"
+            --data-binary @"publish_body.txt" \
+            "https://api.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/tags/android-latest"
+          echo "Body updated"
           # Upload APK
           curl -fsSL -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @"$APK" \
-            "https://uploads.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/403353510/assets?name=app-release.apk" && echo "APK uploaded"
+            "https://uploads.github.com/repos/hamdhi/DocKube-Software-Engineering/releases/403353510/assets?name=app-release.apk"
+          echo "APK uploaded"
