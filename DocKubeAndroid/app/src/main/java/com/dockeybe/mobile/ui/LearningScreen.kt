@@ -39,10 +39,11 @@ fun ChapterListScreen(
     onOpen: (String) -> Unit,
     onScrollIndexChanged: (Int) -> Unit,
     savedScrollIndex: Int,
+    key: Any = content,
 ) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(savedScrollIndex) {
+    LaunchedEffect(key, savedScrollIndex) {
         if (savedScrollIndex >= 0) {
             listState.scrollToItem(savedScrollIndex)
         }

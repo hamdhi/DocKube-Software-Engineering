@@ -171,6 +171,7 @@ Scaffold(
                     onOpen = { screen = Screen.Chapter(it) },
                     onScrollIndexChanged = { chapterListScrollIndex = it },
                     savedScrollIndex = chapterListScrollIndex,
+                    key = content,
                 )
 
                 is Screen.Chapter -> {
