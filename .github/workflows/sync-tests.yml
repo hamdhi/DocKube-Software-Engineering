@@ -1,0 +1,40 @@
+name: Sync Tests (Desktop + Mobile)
+
+# Runs the smoke/regression and deep-sync tests on every push that touches
+# either app's content or the test suite itself. Fails the build if the
+# desktop and mobile apps drift apart.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'DockKubeDesktop/android_content.json'
+      - 'DocKubeAndroid/app/src/main/assets/android_content.json'
+      - 'DockKubeDesktop/app_update.py'
+      - 'DocKubeAndroid/app/build.gradle.kts'
+      - '.github/workflows/build-desktop.yml'
+      - 'tests/**'
+  pull_request:
+    paths:
+      - 'DockKubeDesktop/android_content.json'
+      - 'DocKubeAndroid/app/src/main/assets/android_content.json'
+      - 'tests/**'
+
+jobs:
+  sync-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Smoke and regression tests
+        run: python tests/test_sync_smoke.py
+
+      - name: Deep content sync diff
+        run: python tests/test_deep_sync.py
