@@ -2747,8 +2747,8 @@
       {
        "label": "Dump Full Database",
        "command": "pg_dump -d {arg} > dump.sql"
-      }
-{
+      },
+      {
         "label": "Create Database",
         "command": "psql -U postgres -c 'CREATE DATABASE {arg};'"
        },
@@ -2812,7 +2812,7 @@
       {
        "label": "Dump Full Database",
        "command": "mysqldump {arg} > dump.sql"
-      }
+      },
 {
         "label": "Create Database",
         "command": "mysql -u root -p -e 'CREATE DATABASE {arg};'"
@@ -2873,7 +2873,7 @@
       {
        "label": "List Indexes",
        "command": "mongosh {arg} --eval 'db.orders.getIndexes()'"
-      }
+      },
 {
         "label": "Create Database",
         "command": "mongosh {arg} --eval 'db.createCollection(\"test\")'"
@@ -2927,8 +2927,6 @@
         "command": "mongorestore --db {arg} ./backup/{arg}"
        }
      ]
-    },
-]
      },
      {
       "title": "MySQL SQL Commands",
