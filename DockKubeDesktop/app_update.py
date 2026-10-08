@@ -50,9 +50,9 @@ _VERSION_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 # download name is a preference rather than a formality. Current builds publish
 # DocKubeSetup.exe (the installer) and dockeybe.zip (the folder the in-app
 # updater swaps in), so those come first.
-_PREFERRED_ASSETS = ("dockeybe.zip", "dockube.zip",
-                     "DocKubeSetup.exe", "dockeybe.exe",
-                     "dockube.exe", "DocKube.exe")
+# PREFER THE INSTALLER EXE FOR FRESH INSTALLS
+_PREFERRED_ASSETS = ("DocKubeSetup.exe", "dockeybe.zip", "dockube.zip",
+                     "dockeybe.exe", "dockube.exe", "DocKube.exe")
 
 _CHUNK = 64 * 1024
 
@@ -380,20 +380,31 @@ def _installer_script(staged, target, log_path, is_bundle=False):
       fell straight out of ``:swapped`` into ``:failed`` and wrote the
       failure log even though the update had worked.
     """
-    if is_bundle:
+    # Check if the staged file is an installer exe (DocKubeSetup.exe)
+    is_installer = staged.lower().endswith('.exe') and 'setup' in staged.lower()
+    
+    if is_installer:
+        # For installer exe, run it silently and then start the app
+        launch = os.path.join(os.path.dirname(target), "DocKube.exe")
+        swap = [
+            f'start /wait "" "{staged}" /VERYSILENT /NORESTART /SUPPRESSMSGBOXES /LOG="{log_path}"',
+            "if errorlevel 1 goto :failed",
+        ]
+        cleanup = f'del /F /Q "{staged}" >NUL 2>&1'
+    elif is_bundle:
         launch = os.path.join(target, "DocKube.exe")
         swap = [
             'robocopy "%SOURCE%" "%TARGET%" /MIR /NFL /NDL /NJH /NJS /NP >NUL 2>&1',
             "if not errorlevel 8 goto :swapped",
         ]
+        cleanup = 'rmdir /S /Q "%STAGED%" >NUL 2>&1'
     else:
         launch = target
         swap = [
             'copy /Y "%STAGED%" "%TARGET%" >NUL 2>&1',
             'if not errorlevel 1 goto :swapped',
         ]
-    cleanup = ('rmdir /S /Q "%STAGED%" >NUL 2>&1' if is_bundle
-               else 'del /F /Q "%STAGED%" >NUL 2>&1')
+        cleanup = 'del /F /Q "%STAGED%" >NUL 2>&1'
     retry_block = [
         "rem The staged update must exist before the retries start, otherwise",
         "rem a bad hand-off burns two minutes failing the same way sixty times.",
