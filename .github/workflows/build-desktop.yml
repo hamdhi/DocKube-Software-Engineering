@@ -66,8 +66,11 @@ jobs:
           tag_name: desktop-latest
           name: Latest Desktop Build
           body_path: release_body.txt
-          # The installer is what a person downloads and installs; the zip is
-          # what the in-app Update button uses to replace an existing install.
+          # The installer exe is the PRIMARY artifact. When the user clicks
+          # Update in the desktop app, it downloads DocKubeSetup.exe and runs
+          # it silently (/VERYSILENT /NORESTART). The zip is a fallback for
+          # in-app hot-swap updates if the installer download fails.
+          # DocKubeSetup.exe MUST be listed FIRST so the updater picks it up.
           files: |
             DockKubeDesktop/dist/DocKubeSetup.exe
             DockKubeDesktop/dist/dockeybe.zip
