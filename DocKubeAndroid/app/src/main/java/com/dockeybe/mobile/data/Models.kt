@@ -39,6 +39,7 @@ data class CategoryContent(
 data class Chapter(
     val title: String,
     val html: String,
+    val copyText: String? = null,
 )
 
 data class DocKubeContent(

@@ -60,6 +60,26 @@ kinds = [(b.kind, b.text[:20]) for b in learning.parse_content(sample)]
 print(kinds)
 assert [k for k, _ in kinds] == ["title", "h2", "h3", "bullet", "bullet", "code", "rule"]
 
+print("\n=== programming guide markdown ===")
+markdown = """# Guide
+
+## Overview
+Readable **bold** text with `inline code`.
+
+- First item
+1. Second item
+
+```python
+print("hello")
+```
+"""
+markdown_blocks = learning.parse_content(learning.markdown_to_html(markdown))
+markdown_kinds = [block.kind for block in markdown_blocks]
+print(markdown_kinds)
+assert markdown_kinds == ["title", "h2", "p", "bullet", "bullet", "code"]
+assert markdown_blocks[2].text == "Readable bold text with inline code."
+assert markdown_blocks[-1].text == 'print("hello")'
+
 print("\n=== mixed html + markdown in one doc ===")
 mixed = [b for b in learning.parse_content(MIXED) if b.kind == "table"]
 print("tables:", len(mixed))

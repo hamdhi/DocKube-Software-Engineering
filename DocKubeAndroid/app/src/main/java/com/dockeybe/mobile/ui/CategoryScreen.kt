@@ -24,8 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,7 +47,7 @@ fun CategoryScreen(
     // navigating away, so going back restores the position.
 
     // "Custom" is a free-text box on the desktop and "Networking Masterclass"
-    // is only a launcher, so neither has commands worth listing here.
+    // is a launcher for the combined masterclass and programming guides.
     if (category.name == "Networking Masterclass") {
         LearningLauncher(onLearning = onLearning)
         return
@@ -63,13 +61,6 @@ fun CategoryScreen(
         )
         return
     }
-    // "Learning Guides" are documentation pages, not shell commands: each
-    // entry carries rendered text in `html` instead of a `command`.
-    if (category.name == "Learning Guides") {
-        GuideList(category = category, listState = listState, onCopy = onCopy)
-        return
-    }
-
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().background(DocBackground),
@@ -171,84 +162,6 @@ fun CommandCard(
 }
 
 @Composable
-private fun GuideList(
-    category: CategoryContent,
-    listState: LazyListState,
-    onCopy: (String) -> Unit,
-) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize().background(DocBackground),
-        contentPadding = ScreenPadding,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (category.doc.isNotBlank()) {
-            item { NoteCard(title = category.name, body = category.doc) }
-        }
-        items(category.commands.size) { index ->
-            GuideCard(guide = category.commands[index], onCopy = onCopy)
-        }
-    }
-}
-
-@Composable
-private fun GuideCard(
-    guide: CommandRef,
-    onCopy: (String) -> Unit,
-) {
-    // Tapping toggles the full guide text inline; `html` already holds the
-    // rendered markdown, and the state resets per list row as you scroll.
-    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = DocSurface),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
-    ) {
-        Column(Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    guide.label,
-                    color = DocText,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    Icons.Default.MenuBook,
-                    contentDescription = if (expanded) "Collapse ${guide.label}" else "Read ${guide.label}",
-                    tint = DocMuted,
-                )
-            }
-            Text(
-                text = if (expanded) "Tap to collapse" else "Tap to read the full guide",
-                color = DocMuted,
-                fontSize = 11.sp,
-            )
-            if (expanded) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = guide.html.orEmpty(),
-                    color = DocText,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                )
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { onCopy(guide.html.orEmpty()) }) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = "Copy ${guide.label}",
-                            tint = DocMuted,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun NoteCard(title: String, body: String) {
     Card(
         colors = CardDefaults.cardColors(containerColor = DocSurfaceHigh),
@@ -270,10 +183,8 @@ private fun LearningLauncher(
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         NoteCard(
             title = "Networking Masterclass",
-            body = "Forty-plus chapters covering IP addresses, subnetting, ports, " +
-                "TCP vs UDP, protocols, network devices, the Linux command line, " +
-                "software engineering, sysadmin, DevOps, Docker, testing, " +
-                "Python, AI, and more.",
+            body = "Your complete offline study library: networking chapters plus " +
+                "practical programming guides, all together in one place.",
         )
         Spacer(Modifier.height(12.dp))
         Card(
@@ -289,7 +200,7 @@ private fun LearningLauncher(
                 Icon(Icons.Default.MenuBook, null, tint = Color(0xFF06131F))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Open the Learning Centre",
+                    "Open Networking Masterclass",
                     color = Color(0xFF06131F),
                     fontWeight = FontWeight.Bold,
                 )

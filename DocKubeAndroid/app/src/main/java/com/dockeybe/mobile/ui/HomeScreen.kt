@@ -43,7 +43,8 @@ fun HomeScreen(
     onSearch: () -> Unit,
     onUpdate: () -> Unit,
 ) {
-    val totalCommands = content.categories.sumOf { it.totalCommands }
+    val categories = content.categories.filterNot { it.name == "Learning Guides" }
+    val totalCommands = categories.sumOf { it.totalCommands }
     // listState is hoisted at the app level and survives navigating away, so
     // returning from a category (or the Learning Centre) restores position.
     LazyColumn(
@@ -67,7 +68,7 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "${content.categories.size} categories, $totalCommands commands " +
+                        "${categories.size} categories, $totalCommands commands " +
                             "and ${content.chapters.size} study chapters. " +
                             "Tap any command to copy it.",
                         color = DocMuted,
@@ -108,7 +109,7 @@ fun HomeScreen(
             )
         }
 
-        items(content.categories, key = { it.name }) { category ->
+        items(categories, key = { it.name }) { category ->
             CategoryRow(category = category, onClick = { onCategory(category.name) })
         }
     }

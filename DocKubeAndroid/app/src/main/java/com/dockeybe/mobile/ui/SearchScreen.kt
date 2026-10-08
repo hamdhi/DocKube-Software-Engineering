@@ -48,7 +48,9 @@ fun SearchScreen(
     // but this keeps the list stable while the text changes.
     val allHits = remember(content) {
         content.categories.flatMap { category ->
-            category.allCommands.map { Hit(category.name, it) }
+            category.allCommands
+                .filter { it.html == null }
+                .map { Hit(category.name, it) }
         }
     }
     val hits = remember(query, allHits) {

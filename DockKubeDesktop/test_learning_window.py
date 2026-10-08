@@ -20,11 +20,13 @@ except Exception:
 
 import learning
 import learning_index
+import learning_guides
 
 app = mod.App()
 app.withdraw()
 
 # The category must offer a launcher instead of inline documentation.
+assert "Learning Guides" not in app.categories, "guides still have a separate sidebar entry"
 app.select_category("Networking Masterclass")
 app.update()
 launchers = [w for w in app.actions.winfo_children()
@@ -36,7 +38,7 @@ for frame in launchers:
         if isinstance(child, learning.ctk.CTkButton):
             buttons.append(child.cget("text"))
 print("buttons:", buttons)
-assert any("Learning" in b for b in buttons), "launcher button missing"
+assert any("Networking Masterclass" in b for b in buttons), "launcher button missing"
 
 # The main window documentation must now be short, not 653 lines.
 doc_lines = int(app.doc_text.index("end-1c").split(".")[0])
@@ -49,11 +51,22 @@ app.update()
 window = app.learning_window
 assert window is not None, "popup was not created"
 print("popup title:", window.title())
+assert window.title() == "DocKube Networking Masterclass"
 print("popup geometry:", window.geometry())
 
-expected = len(learning_index.CHAPTERS) + 1
+guide_chapters = [
+    (f"Programming: {title}", learning.markdown_to_html(body), body)
+    for title, body in learning_guides.load_guides()
+]
+expected = len(learning_index.CHAPTERS) + 1 + len(guide_chapters)
 print("TOC buttons:", len(window._toc_buttons))
 assert len(window._toc_buttons) == expected, "TOC is incomplete"
+first_guide_index = len(learning_index.CHAPTERS) + 1
+window.show_chapter(first_guide_index)
+app.update()
+assert window.copy_btn.winfo_manager() == "grid", "guide copy button is hidden"
+window.copy_current_text()
+assert app.clipboard_get() == guide_chapters[0][2], "guide copy text changed"
 
 
 def find_tables(widget):
@@ -67,10 +80,14 @@ def find_tables(widget):
 
 # Only the selected chapter is rendered, so every chapter has to be visited to
 # prove all of its tables become real widgets.
-chapters = [("Start Here", learning_index.INTRO)] + list(learning_index.CHAPTERS)
+chapters = (
+    [("Start Here", learning_index.INTRO)]
+    + list(learning_index.CHAPTERS)
+    + guide_chapters
+)
 expected_per_chapter = {
-    title: len([b for b in learning.parse_content(body) if b.kind == "table"])
-    for title, body in chapters
+    chapter[0]: len([b for b in learning.parse_content(chapter[1]) if b.kind == "table"])
+    for chapter in chapters
 }
 total_expected = sum(expected_per_chapter.values())
 print(f"tables across all chapters: {total_expected}")
@@ -89,7 +106,8 @@ def table_texts(table):
 cells = 0
 broken = []
 missing = []
-for index, (title, _body) in enumerate(chapters):
+for index, chapter in enumerate(chapters):
+    title = chapter[0]
     window.show_chapter(index)
     app.update()
     tables = find_tables(window.outer)

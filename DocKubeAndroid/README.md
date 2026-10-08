@@ -1,10 +1,11 @@
-# DocKube-Android v1.4.0 (release notes)
+# DocKube-Android v1.8.0 (release notes)
 
 # DocKube Mobile
 
 The phone companion to the DocKube desktop app. It is a **reference**, not a
-tool: it holds every command from the desktop app and the whole Learning Centre,
-so you can look things up and copy commands to your clipboard. It deliberately
+tool: it holds every command from the desktop app and the complete Networking
+Masterclass, including programming guides, so you can look things up and copy
+commands to your clipboard. It deliberately
 does not try to run Docker or Kubernetes. All of that content ships inside the
 APK, so it works with no network at all.
 
@@ -34,8 +35,10 @@ Requires `JAVA_HOME=C:\JDK 17`, the SDK at `C:\Android\Sdk` and Gradle at
 
 The command list is not typed in by hand. `export_android_content.py` in the
 parent folder builds the real desktop app, swaps its panel builders for
-recorders, selects all 20 categories, and writes out whatever buttons the
-desktop app would have drawn:
+recorders, selects the visible categories, and writes out whatever buttons the
+desktop app would have drawn. Programming guides are included as a hidden
+content category in the exported JSON so both apps can show them inside the
+Networking Masterclass:
 
     cd ..
     python export_android_content.py
@@ -56,12 +59,12 @@ stale, so a mismatch cannot ship unnoticed.
         ui/HomeScreen.kt         categories
         ui/CategoryScreen.kt     commands, tap to copy or share
         ui/SearchScreen.kt       search across every command
-        ui/LearningScreen.kt     chapter list and the HTML reader
+        ui/LearningScreen.kt     masterclass and programming guide reader
         ui/Theme.kt              DocKube's dark palette
 
 ## Why chapters are a WebView
 
-The Learning Centre is full of comparison tables. Rendered as Compose text they
-collapse into unreadable walls on a narrow screen, so the chapters are the same
-HTML the desktop app shows, styled to match. JavaScript is disabled and the
-WebView is barred from file and content access.
+The Networking Masterclass is full of comparison tables and code examples.
+Rendered as Compose text they collapse into unreadable walls on a narrow screen,
+so chapters and programming guides open in a styled WebView. JavaScript is
+disabled and the WebView is barred from file and content access.

@@ -109,6 +109,130 @@ def _markdown_tables_to_html(source):
     return _TABLE_RE.sub(convert, source)
 
 
+def markdown_to_html(source):
+    """Render the Markdown subset used by programming guides as safe HTML."""
+    source = _markdown_tables_to_html(source)
+    output = []
+    paragraph = []
+    list_tag = None
+    code_lines = None
+
+    def flush_paragraph():
+        if paragraph:
+            content = "<br>".join(_inline_markdown(line) for line in paragraph)
+            output.append(f"<p>{content}</p>")
+            paragraph.clear()
+
+    def close_list():
+        nonlocal list_tag
+        if list_tag:
+            output.append(f"</{list_tag}>")
+            list_tag = None
+
+    lines = source.splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            flush_paragraph()
+            close_list()
+            if code_lines is None:
+                code_lines = []
+            else:
+                output.append(
+                    "<pre><code>" +
+                    html.escape("\n".join(code_lines)) +
+                    "</code></pre>"
+                )
+                code_lines = None
+            index += 1
+            continue
+        if code_lines is not None:
+            code_lines.append(line)
+            index += 1
+            continue
+
+        if stripped == "<table>":
+            flush_paragraph()
+            close_list()
+            table = [line]
+            index += 1
+            while index < len(lines):
+                table.append(lines[index])
+                if "</table>" in lines[index]:
+                    index += 1
+                    break
+                index += 1
+            output.append("\n".join(table))
+            continue
+
+        heading = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if heading:
+            flush_paragraph()
+            close_list()
+            level = min(len(heading.group(1)), 4)
+            output.append(
+                f"<h{level}>{_inline_markdown(heading.group(2))}</h{level}>"
+            )
+            index += 1
+            continue
+
+        if re.fullmatch(r"([-*_]\s*){3,}", stripped):
+            flush_paragraph()
+            close_list()
+            output.append("<hr>")
+            index += 1
+            continue
+
+        unordered = re.match(r"^\s*[-*+]\s+(.+)$", line)
+        ordered = re.match(r"^\s*\d+[.)]\s+(.+)$", line)
+        item = unordered or ordered
+        if item:
+            flush_paragraph()
+            tag = "ul" if unordered else "ol"
+            if list_tag != tag:
+                close_list()
+                output.append(f"<{tag}>")
+                list_tag = tag
+            output.append(f"<li>{_inline_markdown(item.group(1))}</li>")
+            index += 1
+            continue
+
+        if not stripped:
+            flush_paragraph()
+            close_list()
+        else:
+            close_list()
+            paragraph.append(stripped)
+        index += 1
+
+    flush_paragraph()
+    close_list()
+    if code_lines is not None:
+        output.append(
+            "<pre><code>" +
+            html.escape("\n".join(code_lines)) +
+            "</code></pre>"
+        )
+    return "\n".join(output)
+
+
+def _inline_markdown(text):
+    text = html.escape(text)
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"__(.+?)__", r"<strong>\1</strong>", text)
+    text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
+    text = re.sub(r"_(.+?)_", r"<em>\1</em>", text)
+    return re.sub(
+        r"\[([^\]]+)]\((https?://[^)]+)\)",
+        r'<a href="\2">\1</a>',
+        text,
+    )
+
+
 class ContentParser(HTMLParser):
     """Turn authored HTML into a flat list of :class:`Block` objects.
 
@@ -449,8 +573,11 @@ class LearningWindow(ctk.CTkToplevel):
 
     def __init__(self, master, chapters):
         super().__init__(master)
-        self.chapters = chapters
-        self.title("DocKube Learning Centre")
+        self.chapters = [
+            (chapter[0], chapter[1], chapter[2] if len(chapter) > 2 else None)
+            for chapter in chapters
+        ]
+        self.title("DocKube Networking Masterclass")
         self.geometry("1250x820")
         self.minsize(900, 600)
         self.configure(fg_color=BG)
@@ -544,7 +671,7 @@ class LearningWindow(ctk.CTkToplevel):
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=16, pady=(12, 6))
         header.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(header, text="DocKube Learning Centre",
+        ctk.CTkLabel(header, text="DocKube Networking Masterclass",
                      font=ctk.CTkFont(size=22, weight="bold")).grid(
             row=0, column=0, sticky="w")
         ctk.CTkLabel(header, text="Start here if you are completely new",
@@ -561,7 +688,7 @@ class LearningWindow(ctk.CTkToplevel):
         sidebar.grid_rowconfigure(1, weight=1)
         sidebar.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(sidebar, text="CHAPTERS", anchor="w",
+        ctk.CTkLabel(sidebar, text="MASTERCLASS & GUIDES", anchor="w",
                      font=ctk.CTkFont(weight="bold"), text_color=MUTED).grid(
             row=0, column=0, padx=14, pady=(12, 6), sticky="w")
 
@@ -570,9 +697,9 @@ class LearningWindow(ctk.CTkToplevel):
                     scrollbar_button_hover_color="#484f58")
         toc.grid(row=1, column=0, sticky="nsew", padx=(6, 2), pady=(0, 4))
         self._toc = toc
-        for index, (title, _body) in enumerate(self.chapters):
+        for index, chapter in enumerate(self.chapters):
             button = ctk.CTkButton(
-                toc, text=title, anchor="w", fg_color="transparent",
+                toc, text=chapter[0], anchor="w", fg_color="transparent",
                 text_color=("gray10", "gray90"), hover_color=("#21262d", "#30363d"),
                 command=lambda i=index: self.show_chapter(i))
             button.pack(fill="x", pady=2, padx=4)
@@ -590,6 +717,12 @@ class LearningWindow(ctk.CTkToplevel):
         self.next_btn = ctk.CTkButton(footer, text="Next", width=90,
                                       command=lambda: self.step_chapter(1))
         self.next_btn.grid(row=0, column=2)
+        self.copy_btn = ctk.CTkButton(
+            footer, text="Copy Guide Text", width=130,
+            command=self.copy_current_text,
+        )
+        self.copy_btn.grid(row=0, column=3, padx=(8, 0))
+        self.copy_btn.grid_remove()
 
         # Tables are embedded as real child widgets inside this frame so they
         # scroll together with the surrounding text.
@@ -606,6 +739,17 @@ class LearningWindow(ctk.CTkToplevel):
         if 0 <= target < len(self.chapters):
             self.show_chapter(target)
 
+    def copy_current_text(self):
+        """Copy the original Markdown for a selected programming guide."""
+        if self._current is None:
+            return
+        body = self.chapters[self._current][2]
+        if body is None:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(body)
+        self.status.configure(text="Copied guide text to clipboard")
+
     def _clear(self):
         for child in self.outer.winfo_children():
             child.destroy()
@@ -621,7 +765,7 @@ class LearningWindow(ctk.CTkToplevel):
         """
         self._clear()
         self._current = index
-        title, body = self.chapters[index]
+        title, body, _copy_text = self.chapters[index]
         self._render_chapter(index, title, body, 0)
         self.outer._parent_canvas.yview_moveto(0.0)
 
@@ -705,6 +849,10 @@ class LearningWindow(ctk.CTkToplevel):
             return
         if index != self._current:
             self._render(index)
+        if self.chapters[index][2] is None:
+            self.copy_btn.grid_remove()
+        else:
+            self.copy_btn.grid()
         for number, button in self._toc_buttons.items():
             button.configure(
                 fg_color="#1f6feb" if number == index else "transparent")

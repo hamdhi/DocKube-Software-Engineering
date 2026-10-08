@@ -39,16 +39,18 @@ chapters = data["chapters"]
 print(f"categories: {len(categories)}")
 print(f"chapters  : {len(chapters)}")
 
-# The desktop app's own sidebar plus the Learning Guides section. Both must
-# agree: the JSON is supposed to be exactly what the desktop app would draw.
+# The exported catalogue includes Learning Guides as a virtual category so
+# mobile can place them inside Networking Masterclass without a sidebar entry.
 # Parse the hardcoded self.categories list out of app.py without importing Tk.
 import re as _re
 _app_src = open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
 _m = _re.search(r"self\.categories\s*=\s*\[(.*?)\]", _app_src, _re.DOTALL)
 if _m:
     _app_cats = _re.findall(r'"([^"]+)"', _m.group(1))
-    check(list(categories) == _app_cats,
-          f"JSON categories drifted from app.py: json={list(categories)} app={_app_cats}")
+    expected_categories = _app_cats + ["Learning Guides"]
+    check(list(categories) == expected_categories,
+          f"JSON categories drifted from app.py: json={list(categories)} "
+          f"expected={expected_categories}")
 else:
     check(False, "could not find self.categories in app.py")
 

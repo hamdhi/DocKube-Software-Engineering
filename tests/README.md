@@ -24,7 +24,7 @@ fails, so they can be wired into CI.
 - Category and command-section sets match
 - Per-section command counts match
 - Database groups (including MySQL/PostgreSQL/MongoDB SQL command groups)
-- Learning Guides present in both apps with HTML content
+- Learning Guides present in both apps and shown inside Networking Masterclass
 - Desktop `APP_VERSION` matches mobile `versionName`
 - GitHub workflow publishes `DocKubeSetup.exe` before `dockeybe.zip`
 - Updater prefers the installer exe and runs it with `/VERYSILENT`

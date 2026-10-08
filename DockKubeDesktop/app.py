@@ -17,7 +17,7 @@ import app_update
 import devops_tools
 import learning_index
 from docs_content import COMMAND_PREFIXES, EXTRA_DOCS
-from learning import LearningWindow, SIDEBAR_WIDTH
+from learning import LearningWindow, SIDEBAR_WIDTH, markdown_to_html
 from fast_scroller import FastScroller
 from shared_console import SharedTerminal
 
@@ -134,8 +134,7 @@ class App(ctk.CTk):
             "MySQL", "Postgres", "MongoDB", "CI/CD & GitHub Actions",
             "GitHub", "Jenkins", "Terraform", "Ansible", "Port Manager",
             "Custom", "Networking Masterclass", "Security Testing",
-            "Firewalls", "Diagrams", "Databases", "Windows Diagnostics",
-            "Learning Guides"
+            "Firewalls", "Diagrams", "Databases", "Windows Diagnostics"
         ]
         ctk.CTkLabel(self.sidebar, text="DocKube",
                      font=ctk.CTkFont(size=20, weight="bold")).grid(
@@ -345,7 +344,7 @@ class App(ctk.CTk):
                 "have."
             ),
             "Networking Masterclass": (
-                "Open the Learning Centre for the full study guide.\n\n"
+                "Open the Networking Masterclass for the complete study library.\n\n"
                 f"{len(learning_index.CHAPTERS)} chapters covering networking "
                 "fundamentals, IP addresses, subnetting, ports, TCP vs UDP, "
                 "protocols, network devices, the Linux command line and "
@@ -354,15 +353,9 @@ class App(ctk.CTk):
                 "Every chapter explains the theory in plain English, shows "
                 "the real commands, gives memory tricks, includes a "
                 "Learning vs Production comparison, and ends with an "
-                "exercise you can run on this machine.\n\n"
-                "Press the button below to open it in its own window."
-            ),
-            "Learning Guides": (
-                "Production programming guides: Pydantic v2, SQLAlchemy 2.0, "
-                "Alembic, JWT auth, exception handling, pagination, middleware, "
-                "dependency injection, async vs def, password hashing, RBAC, "
-                "pytest, RAG, DevOps templates and memory tricks.\n\n"
-                "Click a topic below to read the full guide in its own window."
+                "exercise you can run on this machine. Practical programming "
+                "guides are included in the same chapter list.\n\n"
+                "Press the button below to open the masterclass."
             ),
         }
         # Replace the short placeholder entries with the full guides.
@@ -449,8 +442,6 @@ class App(ctk.CTk):
             self.add_custom_input()
         elif cat == "Networking Masterclass":
             self.add_learning_launcher()
-        elif cat == "Learning Guides":
-            self.add_learning_guides_panel()
         else:
             self.add_yaml_apply()
     # ------------------------------------------------------------------
@@ -459,87 +450,34 @@ class App(ctk.CTk):
         frm = ctk.CTkFrame(self.actions)
         frm.pack(pady=10, fill="x", anchor="w", padx=5)
         ctk.CTkLabel(
-            frm, text="The full study guide opens in its own window.",
+            frm, text="Networking chapters and programming guides, together.",
             text_color=("gray40", "gray60"), anchor="w"
         ).pack(fill="x", padx=10, pady=(8, 4))
         ctk.CTkButton(
-            frm, text="Open Learning Centre", height=40,
+            frm, text="Open Networking Masterclass", height=40,
             font=ctk.CTkFont(size=15, weight="bold"),
             command=self.open_learning_centre
         ).pack(fill="x", padx=10, pady=(0, 10))
         ctk.CTkLabel(
             frm,
-            text=f"{len(learning_index.CHAPTERS)} chapters, fully explained, with\n"
-                 "real commands, memory tricks, Learning vs Production\n"
-                 "tables and hands-on exercises you can run here.",
+            text=f"{len(learning_index.CHAPTERS)} masterclass chapters plus\n"
+                 "practical programming guides, all in one offline reader.",
             text_color=("gray40", "gray60"), anchor="w", justify="left"
         ).pack(fill="x", padx=10, pady=(0, 10))
     # ------------------------------------------------------------------
-    def add_learning_guides_panel(self):
-        """One button per production-programming guide from docs/learning."""
-        try:
-            import learning_guides
-            guides = learning_guides.load_guides()
-        except Exception:
-            guides = []
-        frm = ctk.CTkFrame(self.actions)
-        frm.pack(pady=10, fill="x", anchor="w", padx=5)
-        frm.grid_columnconfigure(0, weight=1)
-        frm.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(
-            frm, text="Production guides. Click a topic to read it.",
-            text_color=("gray40", "gray60"), anchor="w"
-        ).grid(row=0, column=0, columnspan=2, padx=10, pady=(8, 4), sticky="w")
-        if not guides:
-            ctk.CTkLabel(
-                frm,
-                text="No guides found. The docs/learning folder is missing.",
-                text_color=("orange", "gold"), anchor="w"
-            ).grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="w")
-            return
-        for index, (title, body) in enumerate(guides):
-            def opener(t=title, b=body):
-                self.open_learning_guide(t, b)
-            ctk.CTkButton(
-                frm, text=title, anchor="w", command=opener
-            ).grid(row=1 + index // 2, column=index % 2,
-                   padx=(10, 5) if index % 2 == 0 else (5, 10),
-                   pady=2, sticky="ew")
-    # ------------------------------------------------------------------
-    def open_learning_guide(self, title, body):
-        """Show one guide in a popup with a copy button, like the terminal."""
-        win = ctk.CTkToplevel(self)
-        win.title(f"DocKube - {title}")
-        win.geometry("780x620")
-        win.grid_columnconfigure(0, weight=1)
-        win.grid_rowconfigure(0, weight=0)
-        win.grid_rowconfigure(1, weight=1)
-        header = ctk.CTkFrame(win, corner_radius=0)
-        header.grid(row=0, column=0, sticky="ew")
-        ctk.CTkLabel(
-            header, text=title, font=ctk.CTkFont(size=16, weight="bold")
-        ).pack(side="left", padx=12, pady=8)
-        box = ctk.CTkTextbox(win, font=ctk.CTkFont(family="Consolas", size=13))
-        box.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
-        box.insert("1.0", body)
-        box.configure(state="disabled")
-
-        def copy_text():
-            win.clipboard_clear()
-            win.clipboard_append(body)
-            self.set_status(f"Copied {title} to clipboard")
-
-        ctk.CTkButton(
-            win, text="Copy Guide Text", command=copy_text
-        ).grid(row=2, column=0, padx=10, pady=(0, 10), sticky="ew")
     # ------------------------------------------------------------------
     def open_learning_centre(self):
-        """Open (or focus) the Learning Centre popup window."""
+        """Open (or focus) the Networking Masterclass and guide reader."""
         if self.learning_window is not None and self.learning_window.winfo_exists():
             self.learning_window.lift()
             self.learning_window.focus_force()
             return
+        import learning_guides
         chapters = [("Start Here", learning_index.INTRO)] + learning_index.CHAPTERS
+        chapters.extend(
+            (f"Programming: {title}", markdown_to_html(body), body)
+            for title, body in learning_guides.load_guides()
+        )
         self.learning_window = LearningWindow(self, chapters)
         self.learning_window.protocol("WM_DELETE_WINDOW", self.close_learning_centre)
     # ------------------------------------------------------------------

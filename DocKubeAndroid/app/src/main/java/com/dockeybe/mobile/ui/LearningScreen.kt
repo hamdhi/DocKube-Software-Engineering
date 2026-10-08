@@ -36,8 +36,16 @@ import com.dockeybe.mobile.data.DocKubeContent
 fun ChapterListScreen(
     content: DocKubeContent,
     listState: LazyListState,
-    onOpen: (String) -> Unit,
+    onOpen: (Chapter) -> Unit,
 ) {
+    val guides = content.categories
+        .firstOrNull { it.name == "Learning Guides" }
+        ?.commands
+        .orEmpty()
+        .mapNotNull { guide ->
+            guide.html?.let { Chapter(guide.label, markdownToHtml(it), copyText = it) }
+        }
+
     // listState is hoisted at the app level and survives opening a chapter, so
     // going back restores the list exactly where it was.
 
@@ -49,18 +57,38 @@ fun ChapterListScreen(
     ) {
         item {
             NoteCard(
-                title = "Learning Centre",
-                body = "Everything here works offline. Read a chapter, then copy any " +
-                    "command out of it into an SSH client on your machine.",
+                title = "Networking Masterclass",
+                body = "Master networking and practical programming in one offline " +
+                    "library. Choose a chapter or open a programming guide below.",
             )
         }
+        item(key = "masterclass-heading") { LearningSectionHeader("Masterclass Chapters") }
         items(content.chapters, key = { it.title }) { chapter ->
             ChapterRow(
                 chapter = chapter,
-                onClick = { onOpen(chapter.title) },
+                onClick = { onOpen(chapter) },
             )
         }
+        if (guides.isNotEmpty()) {
+            item(key = "programming-guides-heading") {
+                LearningSectionHeader("Programming Guides")
+            }
+            items(guides, key = { "guide-${it.title}" }) { guide ->
+                ChapterRow(chapter = guide, onClick = { onOpen(guide) })
+            }
+        }
     }
+}
+
+@Composable
+private fun LearningSectionHeader(title: String) {
+    androidx.compose.material3.Text(
+        text = title,
+        color = DocMuted,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 10.dp),
+    )
 }
 
 @Composable
@@ -85,9 +113,8 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
 }
 
 /**
- * Chapters ship as HTML because the desktop guide is full of comparison tables.
- * Reusing a WebView keeps those tables intact, which a Compose text renderer
- * would flatten into unreadable walls of text on a narrow phone screen.
+ * Masterclass chapters ship as HTML; programming guides ship as Markdown.
+ * Rendering both in a styled WebView preserves tables and code on phone screens.
  */
 @Composable
 fun ChapterScreen(chapter: Chapter) {
@@ -136,8 +163,138 @@ private fun wrapForDisplay(title: String, body: String): String = """
   tr:nth-child(even) td { background:#161B22; }
   ul, ol { padding-left:22px; }
   strong { color:#FFFFFF; }
+  hr { border:0; border-top:1px solid #30363D; margin:18px 0; }
 </style></head>
-<body><h1>$title</h1>
+<body><h1>${title.escapeHtml()}</h1>
 $body
 </body></html>
 """.trimIndent()
+
+private fun markdownToHtml(markdown: String): String {
+    val output = StringBuilder()
+    val paragraph = mutableListOf<String>()
+    var listTag: String? = null
+    var inCodeBlock = false
+
+    fun flushParagraph() {
+        if (paragraph.isNotEmpty()) {
+            output.append("<p>")
+                .append(paragraph.joinToString("<br>") { it.toInlineHtml() })
+                .append("</p>")
+            paragraph.clear()
+        }
+    }
+
+    fun closeList() {
+        listTag?.let { output.append("</").append(it).append(">") }
+        listTag = null
+    }
+
+    val lines = markdown.lines()
+    var index = 0
+    while (index < lines.size) {
+        val line = lines[index]
+        val trimmed = line.trim()
+
+        if (trimmed.startsWith("```")) {
+            flushParagraph()
+            closeList()
+            if (inCodeBlock) output.append("</code></pre>") else output.append("<pre><code>")
+            inCodeBlock = !inCodeBlock
+            index++
+            continue
+        }
+        if (inCodeBlock) {
+            output.append(line.escapeHtml()).append('\n')
+            index++
+            continue
+        }
+
+        val heading = Regex("^(#{1,6})\\s+(.+)$").matchEntire(trimmed)
+        if (heading != null) {
+            flushParagraph()
+            closeList()
+            val level = heading.groupValues[1].length
+            output.append("<h").append(level).append(">")
+                .append(heading.groupValues[2].toInlineHtml())
+                .append("</h").append(level).append(">")
+            index++
+            continue
+        }
+
+        if (trimmed.contains('|') && lines.getOrNull(index + 1)?.let(::isTableSeparator) == true) {
+            flushParagraph()
+            closeList()
+            output.append("<table><thead><tr>")
+            trimmed.toTableCells().forEach { output.append("<th>").append(it.toInlineHtml()).append("</th>") }
+            output.append("</tr></thead><tbody>")
+            index += 2
+            while (index < lines.size && lines[index].trim().contains('|')) {
+                output.append("<tr>")
+                lines[index].trim().toTableCells().forEach {
+                    output.append("<td>").append(it.toInlineHtml()).append("</td>")
+                }
+                output.append("</tr>")
+                index++
+            }
+            output.append("</tbody></table>")
+            continue
+        }
+
+        val unordered = Regex("^\\s*[-*+]\\s+(.+)$").matchEntire(line)
+        val ordered = Regex("^\\s*\\d+[.)]\\s+(.+)$").matchEntire(line)
+        val item = unordered ?: ordered
+        if (item != null) {
+            flushParagraph()
+            val tag = if (unordered != null) "ul" else "ol"
+            if (listTag != tag) {
+                closeList()
+                output.append("<").append(tag).append(">")
+                listTag = tag
+            }
+            output.append("<li>").append(item.groupValues[1].toInlineHtml()).append("</li>")
+            index++
+            continue
+        }
+
+        if (trimmed.isEmpty()) {
+            flushParagraph()
+            closeList()
+        } else {
+            closeList()
+            paragraph.add(trimmed)
+        }
+        index++
+    }
+
+    flushParagraph()
+    closeList()
+    if (inCodeBlock) output.append("</code></pre>")
+    return output.toString()
+}
+
+private fun isTableSeparator(line: String): Boolean =
+    line.trim().contains('|') && line.trim().trim('|').split('|')
+        .all { cell -> cell.trim().matches(Regex(":?-{3,}:?")) }
+
+private fun String.toTableCells(): List<String> =
+    trim().removePrefix("|").removeSuffix("|").split('|').map(String::trim)
+
+private fun String.toInlineHtml(): String =
+    escapeHtml()
+        .replace(Regex("`([^`]+)`"), "<code>$1</code>")
+        .replace(Regex("\\*\\*(.+?)\\*\\*"), "<strong>$1</strong>")
+        .replace(Regex("__(.+?)__"), "<strong>$1</strong>")
+        .replace(Regex("\\*(.+?)\\*"), "<em>$1</em>")
+        .replace(Regex("_(.+?)_"), "<em>$1</em>")
+        .replace(
+            Regex("\\[([^\\]]+)]\\((https?://[^)]+)\\)"),
+            "<a href=\"$2\">$1</a>",
+        )
+
+private fun String.escapeHtml(): String =
+    replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;")

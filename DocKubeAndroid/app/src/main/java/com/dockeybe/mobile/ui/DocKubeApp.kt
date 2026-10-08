@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.LazyListState
+import com.dockeybe.mobile.data.Chapter as LearningChapter
 import com.dockeybe.mobile.data.DocKubeContent
 import kotlinx.coroutines.launch
 
@@ -44,7 +46,7 @@ sealed interface Screen {
     data object Home : Screen
     data class Category(val name: String) : Screen
     data object ChapterList : Screen
-    data class Chapter(val title: String) : Screen
+    data class Chapter(val chapter: LearningChapter) : Screen
     data object Search : Screen
 }
 
@@ -154,8 +156,8 @@ Scaffold(
                         text = when (val s = screen) {
                             is Screen.Home -> "DocKube"
                             is Screen.Category -> s.name
-                            is Screen.ChapterList -> "Learning Centre"
-                            is Screen.Chapter -> s.title
+                            is Screen.ChapterList -> "Networking Masterclass"
+                            is Screen.Chapter -> s.chapter.title
                             is Screen.Search -> "Search commands"
                         },
                         maxLines = 1,
@@ -172,6 +174,20 @@ Scaffold(
                                 contentDescription = "Back",
                                 tint = DocAccent,
                             )
+                        }
+                    }
+                },
+                actions = {
+                    val selected = screen
+                    if (selected is Screen.Chapter) {
+                        selected.chapter.copyText?.let { guideText ->
+                            IconButton(onClick = { copyText(guideText) }) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Copy ${selected.chapter.title}",
+                                    tint = DocAccent,
+                                )
+                            }
                         }
                     }
                 },
@@ -211,11 +227,7 @@ Scaffold(
                     onOpen = { screen = Screen.Chapter(it) },
                 )
 
-                is Screen.Chapter -> {
-                    val chapter = content.chapters.firstOrNull { it.title == s.title }
-                    if (chapter == null) screen = Screen.ChapterList
-                    else ChapterScreen(chapter = chapter)
-                }
+                is Screen.Chapter -> ChapterScreen(chapter = s.chapter)
 
                 is Screen.Search -> SearchScreen(
                     content = content,

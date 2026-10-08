@@ -34,7 +34,10 @@ def main():
     app = mod.App()
     app.withdraw()
 
-    categories = list(app.categories)
+    visible_categories = list(app.categories)
+    # Learning Guides are included in the exported library but live inside
+    # Networking Masterclass in the desktop navigation.
+    categories = visible_categories + ["Learning Guides"]
 
     # Record what each category would have drawn, instead of drawing it.
     captured = {}
@@ -83,7 +86,7 @@ def main():
     # The per-tool helpers all funnel through those two functions, so swapping
     # them is enough to capture GitHub, CI/CD, Jenkins, Terraform, Ansible and
     # the database panels without touching each one.
-    for category in categories:
+    for category in visible_categories:
         current = {"groups": [], "commands": []}
         captured[category] = current
         try:
