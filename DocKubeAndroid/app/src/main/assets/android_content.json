@@ -2748,6 +2748,38 @@
        "label": "Dump Full Database",
        "command": "pg_dump -d {arg} > dump.sql"
       }
+{
+        "label": "Create Database",
+        "command": "psql -U postgres -c 'CREATE DATABASE {arg};'"
+       },
+       {
+        "label": "Drop Database",
+        "command": "psql -U postgres -c 'DROP DATABASE {arg};'"
+       },
+       {
+        "label": "Show Create Table",
+        "command": "psql -U postgres -d {arg} -c '\\\\d users'"
+       },
+       {
+        "label": "Create Index",
+        "command": "psql -U postgres -d {arg} -c 'CREATE INDEX idx_email ON users(email);'"
+       },
+       {
+        "label": "Drop Index",
+        "command": "psql -U postgres -d {arg} -c 'DROP INDEX idx_email;'"
+       },
+       {
+        "label": "Show Activity",
+        "command": "psql -U postgres -c 'SELECT * FROM pg_stat_activity;'"
+       },
+       {
+        "label": "Vacuum Analyze",
+        "command": "psql -U postgres -d {arg} -c 'VACUUM ANALYZE;'"
+       },
+       {
+        "label": "Restore Database",
+        "command": "psql -U postgres -d {arg} < dump.sql"
+       }
      ]
     },
     {
@@ -2781,6 +2813,38 @@
        "label": "Dump Full Database",
        "command": "mysqldump {arg} > dump.sql"
       }
+{
+        "label": "Create Database",
+        "command": "mysql -u root -p -e 'CREATE DATABASE {arg};'"
+       },
+       {
+        "label": "Drop Database",
+        "command": "mysql -u root -p -e 'DROP DATABASE {arg};'"
+       },
+       {
+        "label": "Show Create Table",
+        "command": "mysql -u root -p -D {arg} -e 'SHOW CREATE TABLE users\\G'"
+       },
+       {
+        "label": "Create Index",
+        "command": "mysql -u root -p -D {arg} -e 'CREATE INDEX idx_email ON users(email);'"
+       },
+       {
+        "label": "Drop Index",
+        "command": "mysql -u root -p -D {arg} -e 'DROP INDEX idx_email ON users;'"
+       },
+       {
+        "label": "Show Processlist",
+        "command": "mysql -u root -p -e 'SHOW FULL PROCESSLIST;'"
+       },
+       {
+        "label": "Show Variables",
+        "command": "mysql -u root -p -e 'SHOW GLOBAL VARIABLES;'"
+       },
+       {
+        "label": "Restore Database",
+        "command": "mysql -u root -p {arg} < dump.sql"
+       }
      ]
     },
     {
@@ -2810,9 +2874,336 @@
        "label": "List Indexes",
        "command": "mongosh {arg} --eval 'db.orders.getIndexes()'"
       }
+{
+        "label": "Create Database",
+        "command": "mongosh {arg} --eval 'db.createCollection(\"test\")'"
+       },
+       {
+        "label": "Drop Database",
+        "command": "mongosh {arg} --eval 'db.dropDatabase()'"
+       },
+       {
+        "label": "Insert One",
+        "command": "mongosh {arg} --eval 'db.users.insertOne({name: \"John\", email: \"john@example.com\"})'"
+       },
+       {
+        "label": "Find With Filter",
+        "command": "mongosh {arg} --eval 'db.users.find({status: \"active\"})'"
+       },
+       {
+        "label": "Update One",
+        "command": "mongosh {arg} --eval 'db.users.updateOne({email: \"john@example.com\"}, {$set: {name: \"John Smith\"}})'"
+       },
+       {
+        "label": "Delete One",
+        "command": "mongosh {arg} --eval 'db.users.deleteOne({email: \"john@example.com\"})'"
+       },
+       {
+        "label": "Aggregation: Group By",
+        "command": "mongosh {arg} --eval 'db.users.aggregate([{$group: {_id: \"$status\", count: {$sum: 1}}}])'"
+       },
+       {
+        "label": "Create Text Index",
+        "command": "mongosh {arg} --eval 'db.users.createIndex({name: \"text\", email: \"text\"})'"
+       },
+       {
+        "label": "Create TTL Index",
+        "command": "mongosh {arg} --eval 'db.logs.createIndex({createdAt: 1}, {expireAfterSeconds: 86400})'"
+       },
+       {
+        "label": "Server Status",
+        "command": "mongosh {arg} --eval 'db.serverStatus()'"
+       },
+       {
+        "label": "Replica Set Status",
+        "command": "mongosh {arg} --eval 'rs.status()'"
+       },
+       {
+        "label": "Dump Database",
+        "command": "mongodump --db {arg} --out ./backup"
+       },
+       {
+        "label": "Restore Database",
+        "command": "mongorestore --db {arg} ./backup/{arg}"
+       }
      ]
     },
+{
+      "title": "MySQL SQL Commands",
+      "items": [
+       {
+        "label": "Show Databases",
+        "command": "mysql -u root -p -e 'SHOW DATABASES;'"
+       },
+       {
+        "label": "Create Database",
+        "command": "mysql -u root -p -e 'CREATE DATABASE {arg};'"
+       },
+       {
+        "label": "Drop Database",
+        "command": "mysql -u root -p -e 'DROP DATABASE {arg};'"
+       },
+       {
+        "label": "Show Tables",
+        "command": "mysql -u root -p -D {arg} -e 'SHOW TABLES;'"
+       },
+       {
+        "label": "Create Table",
+        "command": "mysql -u root -p -D {arg} -e 'CREATE TABLE users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100), email VARCHAR(100), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);'"
+       },
+       {
+        "label": "Describe Table",
+        "command": "mysql -u root -p -D {arg} -e 'DESCRIBE users;'"
+       },
+       {
+        "label": "Show Create Table",
+        "command": "mysql -u root -p -D {arg} -e 'SHOW CREATE TABLE users\\G'"
+       },
+       {
+        "label": "Insert Row",
+        "command": "mysql -u root -p -D {arg} -e \"INSERT INTO users (name, email) VALUES ('John', 'john@example.com');\""
+       },
+       {
+        "label": "Select All",
+        "command": "mysql -u root -p -D {arg} -e 'SELECT * FROM users;'"
+       },
+       {
+        "label": "Select Where",
+        "command": "mysql -u root -p -D {arg} -e \"SELECT * FROM users WHERE email='john@example.com';\""
+       },
+       {
+        "label": "Update Row",
+        "command": "mysql -u root -p -D {arg} -e \"UPDATE users SET name='John Smith' WHERE email='john@example.com';\""
+       },
+       {
+        "label": "Delete Row",
+        "command": "mysql -u root -p -D {arg} -e \"DELETE FROM users WHERE email='john@example.com';\""
+       },
+       {
+        "label": "Create Index",
+        "command": "mysql -u root -p -D {arg} -e 'CREATE INDEX idx_email ON users(email);'"
+       },
+       {
+        "label": "Drop Index",
+        "command": "mysql -u root -p -D {arg} -e 'DROP INDEX idx_email ON users;'"
+       },
+       {
+        "label": "Show Processlist",
+        "command": "mysql -u root -p -e 'SHOW FULL PROCESSLIST;'"
+       },
+       {
+        "label": "Explain Query",
+        "command": "mysql -u root -p -D {arg} -e 'EXPLAIN SELECT * FROM users WHERE email=\"john@example.com\";'"
+       },
+       {
+        "label": "Dump Database",
+        "command": "mysqldump -u root -p {arg} > dump.sql"
+       },
+       {
+        "label": "Restore Database",
+        "command": "mysql -u root -p {arg} < dump.sql"
+       }
+      ]
+     },
+{
+      "title": "PostgreSQL SQL Commands",
+      "items": [
+       {
+        "label": "List Databases",
+        "command": "psql -U postgres -c '\\\\l'"
+       },
+       {
+        "label": "Create Database",
+        "command": "psql -U postgres -c 'CREATE DATABASE {arg};'"
+       },
+       {
+        "label": "Drop Database",
+        "command": "psql -U postgres -c 'DROP DATABASE {arg};'"
+       },
+       {
+        "label": "List Tables",
+        "command": "psql -U postgres -d {arg} -c '\\\\dt'"
+       },
+       {
+        "label": "Create Table",
+        "command": "psql -U postgres -d {arg} -c 'CREATE TABLE users (id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);'"
+       },
+       {
+        "label": "Describe Table",
+        "command": "psql -U postgres -d {arg} -c '\\\\d+ users'"
+       },
+       {
+        "label": "Show Create Table",
+        "command": "psql -U postgres -d {arg} -c '\\\\d users'"
+       },
+       {
+        "label": "Insert Row",
+        "command": "psql -U postgres -d {arg} -c \"INSERT INTO users (name, email) VALUES ('John', 'john@example.com');\""
+       },
+       {
+        "label": "Select All",
+        "command": "psql -U postgres -d {arg} -c 'SELECT * FROM users;'"
+       },
+       {
+        "label": "Select Where",
+        "command": "psql -U postgres -d {arg} -c \"SELECT * FROM users WHERE email='john@example.com';\""
+       },
+       {
+        "label": "Update Row",
+        "command": "psql -U postgres -d {arg} -c \"UPDATE users SET name='John Smith' WHERE email='john@example.com';\""
+       },
+       {
+        "label": "Delete Row",
+        "command": "psql -U postgres -d {arg} -c \"DELETE FROM users WHERE email='john@example.com';\""
+       },
+       {
+        "label": "Create Index",
+        "command": "psql -U postgres -d {arg} -c 'CREATE INDEX idx_email ON users(email);'"
+       },
+       {
+        "label": "Drop Index",
+        "command": "psql -U postgres -d {arg} -c 'DROP INDEX idx_email;'"
+       },
+       {
+        "label": "Show Activity",
+        "command": "psql -U postgres -c 'SELECT * FROM pg_stat_activity;'"
+       },
+       {
+        "label": "Explain Query",
+        "command": "psql -U postgres -d {arg} -c 'EXPLAIN ANALYZE SELECT * FROM users WHERE email=\\'john@example.com\\';'"
+       },
+       {
+        "label": "Vacuum Analyze",
+        "command": "psql -U postgres -d {arg} -c 'VACUUM ANALYZE;'"
+       },
+       {
+        "label": "Dump Database",
+        "command": "pg_dump -U postgres {arg} > dump.sql"
+       },
+       {
+        "label": "Restore Database",
+        "command": "psql -U postgres -d {arg} < dump.sql"
+       }
+      ]
+     },
     {
+{
+      "title": "MongoDB NoSQL Commands",
+      "items": [
+       {
+        "label": "Show Databases",
+        "command": "mongosh --eval 'db.adminCommand({listDatabases:1})'"
+       },
+       {
+        "label": "Create Database",
+        "command": "mongosh {arg} --eval 'db.createCollection(\"test\")'"
+       },
+       {
+        "label": "Drop Database",
+        "command": "mongosh {arg} --eval 'db.dropDatabase()'"
+       },
+       {
+        "label": "List Collections",
+        "command": "mongosh {arg} --eval 'db.getCollectionNames()'"
+       },
+       {
+        "label": "Create Collection",
+        "command": "mongosh {arg} --eval 'db.createCollection(\"users\")'"
+       },
+       {
+        "label": "Insert One",
+        "command": "mongosh {arg} --eval 'db.users.insertOne({name: \"John\", email: \"john@example.com\"})'"
+       },
+       {
+        "label": "Insert Many",
+        "command": "mongosh {arg} --eval 'db.users.insertMany([{name: \"Jane\"}, {name: \"Bob\"}])'"
+       },
+       {
+        "label": "Find All",
+        "command": "mongosh {arg} --eval 'db.users.find()'"
+       },
+       {
+        "label": "Find One",
+        "command": "mongosh {arg} --eval 'db.users.findOne({email: \"john@example.com\"})'"
+       },
+       {
+        "label": "Find With Filter",
+        "command": "mongosh {arg} --eval 'db.users.find({status: \"active\"})'"
+       },
+       {
+        "label": "Update One",
+        "command": "mongosh {arg} --eval 'db.users.updateOne({email: \"john@example.com\"}, {$set: {name: \"John Smith\"}})'"
+       },
+       {
+        "label": "Update Many",
+        "command": "mongosh {arg} --eval 'db.users.updateMany({status: \"inactive\"}, {$set: {status: \"archived\"}})'"
+       },
+       {
+        "label": "Delete One",
+        "command": "mongosh {arg} --eval 'db.users.deleteOne({email: \"john@example.com\"})'"
+       },
+       {
+        "label": "Delete Many",
+        "command": "mongosh {arg} --eval 'db.users.deleteMany({status: \"archived\"})'"
+       },
+       {
+        "label": "Aggregation: Group By",
+        "command": "mongosh {arg} --eval 'db.users.aggregate([{$group: {_id: \"$status\", count: {$sum: 1}}}])'"
+       },
+       {
+        "label": "Aggregation: Lookup",
+        "command": "mongosh {arg} --eval 'db.orders.aggregate([{$lookup: {from: \"users\", localField: \"customerId\", foreignField: \"_id\", as: \"customer\"}}])'"
+       },
+       {
+        "label": "Create Single Index",
+        "command": "mongosh {arg} --eval 'db.users.createIndex({email: 1})'"
+       },
+       {
+        "label": "Create Compound Index",
+        "command": "mongosh {arg} --eval 'db.users.createIndex({lastName: 1, firstName: 1})'"
+       },
+       {
+        "label": "Create Unique Index",
+        "command": "mongosh {arg} --eval 'db.users.createIndex({email: 1}, {unique: true})'"
+       },
+       {
+        "label": "Create Text Index",
+        "command": "mongosh {arg} --eval 'db.users.createIndex({name: \"text\", email: \"text\"})'"
+       },
+       {
+        "label": "Create TTL Index",
+        "command": "mongosh {arg} --eval 'db.logs.createIndex({createdAt: 1}, {expireAfterSeconds: 86400})'"
+       },
+       {
+        "label": "Drop Index",
+        "command": "mongosh {arg} --eval 'db.users.dropIndex(\"email_1\")'"
+       },
+       {
+        "label": "List Indexes",
+        "command": "mongosh {arg} --eval 'db.users.getIndexes()'"
+       },
+       {
+        "label": "Explain Query",
+        "command": "mongosh {arg} --eval 'db.users.find({email: \"john@example.com\"}).explain(\"executionStats\")'"
+       },
+       {
+        "label": "Server Status",
+        "command": "mongosh {arg} --eval 'db.serverStatus()'"
+       },
+       {
+        "label": "Replica Status",
+        "command": "mongosh {arg} --eval 'rs.status()'"
+       },
+       {
+        "label": "Dump Database",
+        "command": "mongodump --db {arg} --out ./backup"
+       },
+       {
+        "label": "Restore Database",
+        "command": "mongorestore --db {arg} ./backup/{arg}"
+       }
+      ]
+     },
      "title": "Schema Design and Normalisation",
      "items": [
       {
