@@ -61,6 +61,12 @@ fun CategoryScreen(
         )
         return
     }
+    // "Learning Guides" are documentation pages, not shell commands: each
+    // entry carries rendered text in `html` instead of a `command`.
+    if (category.name == "Learning Guides") {
+        GuideList(category = category, listState = listState, onCopy = onCopy)
+        return
+    }
 
     LazyColumn(
         state = listState,
@@ -157,6 +163,84 @@ fun CommandCard(
                     color = DocMuted,
                     fontSize = 11.sp,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuideList(
+    category: CategoryContent,
+    listState: LazyListState,
+    onCopy: (String) -> Unit,
+) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().background(DocBackground),
+        contentPadding = ScreenPadding,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (category.doc.isNotBlank()) {
+            item { NoteCard(title = category.name, body = category.doc) }
+        }
+        items(category.commands.size) { index ->
+            GuideCard(guide = category.commands[index], onCopy = onCopy)
+        }
+    }
+}
+
+@Composable
+private fun GuideCard(
+    guide: CommandRef,
+    onCopy: (String) -> Unit,
+) {
+    // Tapping toggles the full guide text inline; `html` already holds the
+    // rendered markdown, and the state resets per list row as you scroll.
+    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DocSurface),
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+    ) {
+        Column(Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    guide.label,
+                    color = DocText,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Default.MenuBook,
+                    contentDescription = if (expanded) "Collapse ${guide.label}" else "Read ${guide.label}",
+                    tint = DocMuted,
+                )
+            }
+            Text(
+                text = if (expanded) "Tap to collapse" else "Tap to read the full guide",
+                color = DocMuted,
+                fontSize = 11.sp,
+            )
+            if (expanded) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = guide.html.orEmpty(),
+                    color = DocText,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { onCopy(guide.html.orEmpty()) }) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Copy ${guide.label}",
+                            tint = DocMuted,
+                        )
+                    }
+                }
             }
         }
     }

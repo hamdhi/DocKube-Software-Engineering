@@ -1,5 +1,6 @@
 ﻿"""Drive the Port Manager against live data: populate, filter, sort, guard."""
 import importlib.util
+import os
 import subprocess
 import sys
 import time
@@ -7,7 +8,9 @@ import traceback
 
 import port_manager as pm
 
-spec = importlib.util.spec_from_file_location("app", "app.py")
+# Resolve app.py next to this test file so the test works from any CWD.
+_APP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")
+spec = importlib.util.spec_from_file_location("app", _APP_PATH)
 mod = importlib.util.module_from_spec(spec)
 try:
     spec.loader.exec_module(mod)

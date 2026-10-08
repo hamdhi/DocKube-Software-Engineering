@@ -43,6 +43,7 @@ HIDDEN_IMPORTS = [
     "command_specs",
     "docs_content",
     "templates_content",
+    "learning_guides",
 ] + [f"learning_content_{name}" for name in (
     "net1", "net2", "net3", "net4", "net5", "net6", "net7",
     "linux", "se", "sysadmin", "agile", "aws", "delivery", "devops",
@@ -64,7 +65,13 @@ EXCLUDES = [
 ]
 
 # tkinter data files that the frozen build needs on disk.
+# The Learning Guides panel reads docs/learning/*.md at runtime, so the whole
+# folder ships next to the bundle. Its path is resolved by learning_guides.py
+# (repo layout first, sys._MEIPASS when frozen).
 DATAS = []
+_GUIDE_SOURCE = os.path.join(os.path.dirname(ROOT), "docs", "learning")
+if os.path.isdir(_GUIDE_SOURCE):
+    DATAS.append((_GUIDE_SOURCE, os.path.join("docs", "learning")))
 if hasattr(sys, "frozen"):
     DATAS = []
 else:

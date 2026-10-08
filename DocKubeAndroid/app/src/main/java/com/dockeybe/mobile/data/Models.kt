@@ -13,6 +13,8 @@ data class CommandRef(
     val command: String,
     val arg: Boolean = false,
     val placeholder: String? = null,
+    /** Set for documentation entries (e.g. Learning Guides) that open text. */
+    val html: String? = null,
 )
 
 data class CommandGroup(

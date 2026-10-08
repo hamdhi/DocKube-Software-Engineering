@@ -91,6 +91,22 @@ def main():
         except Exception as exc:
             print(f"  ! {category}: {type(exc).__name__}: {exc}")
 
+    # Learning Guides are documentation, not shell commands: the desktop panel
+    # builds guide-viewer buttons instead of command buttons, so nothing was
+    # recorded for it. Fill it from the same markdown source the panel reads.
+    try:
+        import learning_guides as _lg
+        _guides = _lg.load_guides()
+    except Exception as exc:
+        print(f"  ! Learning Guides: {type(exc).__name__}: {exc}")
+        _guides = []
+    if _guides:
+        captured["Learning Guides"] = {
+            "groups": [],
+            "commands": [{"label": title, "html": body} for title, body in _guides],
+            "learning": True,
+        }
+
     # Documentation blurbs the desktop app shows above the commands.
     docs = {}
     for category in categories:
@@ -124,7 +140,8 @@ def main():
         entry = captured[category]
         count = len(entry["commands"]) + sum(len(g["items"]) for g in entry["groups"])
         total_cmds += count
-        print(f"  {category:32s} {count:3d} commands")
+        kind = "guides" if entry.get("learning") else "commands"
+        print(f"  {category:32s} {count:3d} {kind}")
     print(f"\nchapters: {len(chapters)}")
     print(f"total commands: {total_cmds}")
     print(f"wrote {out_path} "

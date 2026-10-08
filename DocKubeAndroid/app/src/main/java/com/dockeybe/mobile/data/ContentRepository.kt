@@ -79,6 +79,8 @@ object ContentRepository {
                     } else {
                         null
                     },
+                    // Documentation entries carry "html" instead of "command".
+                    html = if (item.has("html")) item.optString("html") else null,
                 )
             }
         }

@@ -134,7 +134,8 @@ class App(ctk.CTk):
             "MySQL", "Postgres", "MongoDB", "CI/CD & GitHub Actions",
             "GitHub", "Jenkins", "Terraform", "Ansible", "Port Manager",
             "Custom", "Networking Masterclass", "Security Testing",
-            "Firewalls", "Diagrams", "Databases", "Windows Diagnostics"
+            "Firewalls", "Diagrams", "Databases", "Windows Diagnostics",
+            "Learning Guides"
         ]
         ctk.CTkLabel(self.sidebar, text="DocKube",
                      font=ctk.CTkFont(size=20, weight="bold")).grid(
@@ -356,6 +357,13 @@ class App(ctk.CTk):
                 "exercise you can run on this machine.\n\n"
                 "Press the button below to open it in its own window."
             ),
+            "Learning Guides": (
+                "Production programming guides: Pydantic v2, SQLAlchemy 2.0, "
+                "Alembic, JWT auth, exception handling, pagination, middleware, "
+                "dependency injection, async vs def, password hashing, RBAC, "
+                "pytest, RAG, DevOps templates and memory tricks.\n\n"
+                "Click a topic below to read the full guide in its own window."
+            ),
         }
         # Replace the short placeholder entries with the full guides.
         self.docs.update(EXTRA_DOCS)
@@ -441,6 +449,8 @@ class App(ctk.CTk):
             self.add_custom_input()
         elif cat == "Networking Masterclass":
             self.add_learning_launcher()
+        elif cat == "Learning Guides":
+            self.add_learning_guides_panel()
         else:
             self.add_yaml_apply()
     # ------------------------------------------------------------------
@@ -464,6 +474,64 @@ class App(ctk.CTk):
                  "tables and hands-on exercises you can run here.",
             text_color=("gray40", "gray60"), anchor="w", justify="left"
         ).pack(fill="x", padx=10, pady=(0, 10))
+    # ------------------------------------------------------------------
+    def add_learning_guides_panel(self):
+        """One button per production-programming guide from docs/learning."""
+        try:
+            import learning_guides
+            guides = learning_guides.load_guides()
+        except Exception:
+            guides = []
+        frm = ctk.CTkFrame(self.actions)
+        frm.pack(pady=10, fill="x", anchor="w", padx=5)
+        frm.grid_columnconfigure(0, weight=1)
+        frm.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(
+            frm, text="Production guides. Click a topic to read it.",
+            text_color=("gray40", "gray60"), anchor="w"
+        ).grid(row=0, column=0, columnspan=2, padx=10, pady=(8, 4), sticky="w")
+        if not guides:
+            ctk.CTkLabel(
+                frm,
+                text="No guides found. The docs/learning folder is missing.",
+                text_color=("orange", "gold"), anchor="w"
+            ).grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="w")
+            return
+        for index, (title, body) in enumerate(guides):
+            def opener(t=title, b=body):
+                self.open_learning_guide(t, b)
+            ctk.CTkButton(
+                frm, text=title, anchor="w", command=opener
+            ).grid(row=1 + index // 2, column=index % 2,
+                   padx=(10, 5) if index % 2 == 0 else (5, 10),
+                   pady=2, sticky="ew")
+    # ------------------------------------------------------------------
+    def open_learning_guide(self, title, body):
+        """Show one guide in a popup with a copy button, like the terminal."""
+        win = ctk.CTkToplevel(self)
+        win.title(f"DocKube - {title}")
+        win.geometry("780x620")
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(0, weight=0)
+        win.grid_rowconfigure(1, weight=1)
+        header = ctk.CTkFrame(win, corner_radius=0)
+        header.grid(row=0, column=0, sticky="ew")
+        ctk.CTkLabel(
+            header, text=title, font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(side="left", padx=12, pady=8)
+        box = ctk.CTkTextbox(win, font=ctk.CTkFont(family="Consolas", size=13))
+        box.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
+        box.insert("1.0", body)
+        box.configure(state="disabled")
+
+        def copy_text():
+            win.clipboard_clear()
+            win.clipboard_append(body)
+            self.set_status(f"Copied {title} to clipboard")
+
+        ctk.CTkButton(
+            win, text="Copy Guide Text", command=copy_text
+        ).grid(row=2, column=0, padx=10, pady=(0, 10), sticky="ew")
     # ------------------------------------------------------------------
     def open_learning_centre(self):
         """Open (or focus) the Learning Centre popup window."""

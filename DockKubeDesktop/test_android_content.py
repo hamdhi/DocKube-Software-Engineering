@@ -39,8 +39,27 @@ chapters = data["chapters"]
 print(f"categories: {len(categories)}")
 print(f"chapters  : {len(chapters)}")
 
+# The desktop app's own sidebar plus the Learning Guides section. Both must
+# agree: the JSON is supposed to be exactly what the desktop app would draw.
+# Parse the hardcoded self.categories list out of app.py without importing Tk.
+import re as _re
+_app_src = open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
+_m = _re.search(r"self\.categories\s*=\s*\[(.*?)\]", _app_src, _re.DOTALL)
+if _m:
+    _app_cats = _re.findall(r'"([^"]+)"', _m.group(1))
+    check(list(categories) == _app_cats,
+          f"JSON categories drifted from app.py: json={list(categories)} app={_app_cats}")
+else:
+    check(False, "could not find self.categories in app.py")
+
 # --- structure -------------------------------------------------------------
-check(len(categories) == 25, f"expected 25 categories, got {len(categories)}")
+# A category is either a command panel (groups/flat commands) or the Learning
+# Guides section, whose entries are {label, html} documentation pages.
+def _is_guide_entry(item):
+    return isinstance(item, dict) and "label" in item and "html" in item
+
+def _is_command_entry(item):
+    return isinstance(item, dict) and "label" in item and "command" in item
 # The intro chapter plus one per entry in learning_index.CHAPTERS.
 import learning_index as _li
 _expected_chapters = 1 + len(_li.CHAPTERS)
@@ -54,6 +73,14 @@ total = 0
 empty = []
 for name in categories:
     entry = commands[name]
+    # The Learning Guides section is documentation, not shell commands:
+    # validate its guide entries instead of command entries.
+    if entry.get("learning"):
+        guides = entry.get("commands", [])
+        for item in guides:
+            check(_is_guide_entry(item), f"{name}: malformed guide {item}")
+        print(f"guides    : {len(guides)} in {name}")
+        continue
     count = len(entry.get("commands", []))
     for group in entry.get("groups", []):
         check("title" in group, f"{name}: a group is missing its title")
@@ -81,6 +108,10 @@ check(set(empty) <= {"Custom", "Networking Masterclass"},
 bad = []
 for name in categories:
     entry = commands[name]
+    # Guide entries are documentation pages, not shell commands: skip them
+    # here; their shape is already checked above.
+    if entry.get("learning"):
+        continue
     items = list(entry.get("commands", []))
     for group in entry.get("groups", []):
         items.extend(group.get("items", []))
