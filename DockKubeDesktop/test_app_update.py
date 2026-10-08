@@ -308,6 +308,8 @@ check(r'"TARGET=C:\app\DocKube.exe"' in single, "the target path is missing")
 check("copy /Y" in single, "the single-file script never copies anything")
 check("start" in single, "the script does not restart the app")
 check("for /L" in single, "the script does not retry the locked copy")
+check('set "PYINSTALLER_RESET_ENVIRONMENT=1"' in single,
+      "the restarted app does not get a fresh PyInstaller runtime")
 
 # The folder build has a thousand libraries beside the exe, so replacing one
 # file would leave the old ones behind. The bundle path must mirror the folder.
@@ -316,6 +318,8 @@ check("robocopy" in bundle, "the bundle script does not mirror the folder")
 check("/MIR" in bundle, "the bundle script must mirror, so stale files are removed")
 check("copy /Y" not in bundle, "the bundle script must not copy a single file")
 check(r'"TARGET=C:\app\DocKube"' in bundle, "the target folder is missing")
+check('set "PYINSTALLER_RESET_ENVIRONMENT=1"' in bundle,
+      "the restarted bundle does not get a fresh PyInstaller runtime")
 
 # ------------------------------------------- the two update-blocking regressions
 # 1. Success must not fall through into :failed. The :swapped block used to end
@@ -324,6 +328,8 @@ check(r'"TARGET=C:\app\DocKube"' in bundle, "the target folder is missing")
 for name, script in (("single", single), ("bundle", bundle)):
     lines = [l for l in script.splitlines() if l.strip()]
     start = next(i for i, l in enumerate(lines) if l.startswith("start "))
+    check(lines[start - 1] == 'set "PYINSTALLER_RESET_ENVIRONMENT=1"',
+          f"{name}: the PyInstaller runtime reset is not set before restart")
     check(lines[start + 1] == "goto :cleanup",
           f"{name}: the success path falls through past 'start' "
           f"(next line is {lines[start + 1]!r}, want 'goto :cleanup')")
@@ -423,20 +429,21 @@ if os.path.isfile(gradle):
               f"versionCode is {code.group(1)}; it must keep rising or the "
               "package installer will reject the update")
         print("release body:", stamped)
-        # The installer quotes the same number, and a mismatch would ship an
-        # installer whose Add/Remove entry lies about the version.
-        iss = os.path.join(HERE, "installer.iss")
-        if os.path.isfile(iss):
-            text = open(iss, encoding="utf-8").read()
-            declared = re.search(r'#define AppVersion "(.*)"', text)
-            check(declared is not None, "installer.iss has no AppVersion")
-            if declared and name:
-                check(declared.group(1) == name.group(1),
-                      f"the installer says {declared.group(1)} but the app "
-                      f"reports {name.group(1)}")
-                print("installer version:", declared.group(1))
 else:
     print("build.gradle.kts not found next to the desktop app; skipped")
+
+# The desktop installer tracks the desktop updater version, independently of
+# the Android app's versionName.
+iss = os.path.join(HERE, "installer.iss")
+if os.path.isfile(iss):
+    text = open(iss, encoding="utf-8").read()
+    declared = re.search(r'#define AppVersion "(.*)"', text)
+    check(declared is not None, "installer.iss has no AppVersion")
+    if declared:
+        check(declared.group(1) == app_update.APP_VERSION,
+              f"the installer says {declared.group(1)} but the desktop app "
+              f"reports {app_update.APP_VERSION}")
+        print("desktop installer version:", declared.group(1))
 
 # ------------------------------------------------ the frozen build has it
 # PyInstaller bundles only what --hidden-import names, so a module that

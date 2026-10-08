@@ -1,6 +1,6 @@
 """Check GitHub for a newer DocKube.exe and put it in place.
 
-The desktop app is a PyInstaller one-file executable, and two consequences
+The desktop app is a PyInstaller onedir executable bundle, and two consequences
 shape this module. A running .exe is locked by Windows, so the process doing
 the updating can never overwrite itself; the swap has to happen from outside
 after the app closes. And ``sys.executable`` only points at the real
@@ -30,7 +30,7 @@ import zipfile
 
 # Single source of truth for the desktop version. The publish workflow greps
 # this line out of the file to stamp the release body, so keep the format.
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.8.1"
 
 RELEASE_URL = ("https://api.github.com/repos/hamdhi/DocKube-Software-Engineering"
                "/releases/tags/desktop-latest")
@@ -425,6 +425,7 @@ def _installer_script(staged, target, log_path, is_bundle=False):
         ":swapped",
         cleanup,
         'del "%LOG%" >NUL 2>&1',
+        'set "PYINSTALLER_RESET_ENVIRONMENT=1"',
         'start "" "%LAUNCH%"',
         "goto :cleanup",
         "",
