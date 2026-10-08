@@ -2,7 +2,7 @@ import json
 import os
 import sys
 
-base = r"C:\Users\32813 MHM Hamdhi\Desktop\DocKube"
+base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 desktop = json.load(open(os.path.join(base, "DockKubeDesktop", "android_content.json"), encoding="utf-8"))
 mobile = json.load(open(os.path.join(base, "DocKubeAndroid", "app", "src", "main", "assets", "android_content.json"), encoding="utf-8"))
 

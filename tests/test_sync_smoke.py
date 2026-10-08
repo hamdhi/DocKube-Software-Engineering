@@ -3,7 +3,7 @@ import os
 import sys
 import re
 
-base = r"C:\Users\32813 MHM Hamdhi\Desktop\DocKube"
+base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 desktop_path = os.path.join(base, "DockKubeDesktop", "android_content.json")
 mobile_path = os.path.join(base, "DocKubeAndroid", "app", "src", "main", "assets", "android_content.json")
 update_py = os.path.join(base, "DockKubeDesktop", "app_update.py")
